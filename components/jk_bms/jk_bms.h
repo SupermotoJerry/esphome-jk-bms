@@ -350,8 +350,8 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   std::string mode_bits_to_string_(uint16_t bitmask);
 
   float get_temperature_(const uint16_t value) {
-    if (value > 100)
-      return (float) (100 - (int16_t) value);
+    if (value > 99)
+      return (float) (99 - (int16_t) value);
 
     return (float) value;
   };
