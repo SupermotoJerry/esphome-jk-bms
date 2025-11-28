@@ -217,6 +217,9 @@ class JkBmsBle : public esphome::ble_client::BLEClientNode, public PollingCompon
   void set_state_of_charge_sensor(sensor::Sensor *state_of_charge_sensor) {
     state_of_charge_sensor_ = state_of_charge_sensor;
   }
+  void set_state_of_health_sensor(sensor::Sensor *state_of_health_sensor) {
+    state_of_health_sensor_ = state_of_health_sensor;
+  }
   void set_capacity_remaining_sensor(sensor::Sensor *capacity_remaining_sensor) {
     capacity_remaining_sensor_ = capacity_remaining_sensor;
   }
@@ -258,6 +261,12 @@ class JkBmsBle : public esphome::ble_client::BLEClientNode, public PollingCompon
   }
   void set_charge_status_text_sensor(text_sensor::TextSensor *charge_status_text_sensor) {
     charge_status_text_sensor_ = charge_status_text_sensor;
+  }
+  void set_software_version_text_sensor(text_sensor::TextSensor *software_version_text_sensor) {
+    software_version_text_sensor_ = software_version_text_sensor;
+  }
+  void set_hardware_version_text_sensor(text_sensor::TextSensor *hardware_version_text_sensor) {
+    hardware_version_text_sensor_ = hardware_version_text_sensor;
   }
 
   void set_charging_switch(switch_::Switch *charging_switch) { charging_switch_ = charging_switch; }
@@ -358,6 +367,7 @@ class JkBmsBle : public esphome::ble_client::BLEClientNode, public PollingCompon
   sensor::Sensor *discharging_power_sensor_;
   sensor::Sensor *power_tube_temperature_sensor_;
   sensor::Sensor *state_of_charge_sensor_;
+  sensor::Sensor *state_of_health_sensor_;
   sensor::Sensor *capacity_remaining_sensor_;
   sensor::Sensor *total_battery_capacity_setting_sensor_;
   sensor::Sensor *charging_cycles_sensor_;
@@ -386,6 +396,8 @@ class JkBmsBle : public esphome::ble_client::BLEClientNode, public PollingCompon
   text_sensor::TextSensor *operation_status_text_sensor_;
   text_sensor::TextSensor *total_runtime_formatted_text_sensor_;
   text_sensor::TextSensor *charge_status_text_sensor_;
+  text_sensor::TextSensor *software_version_text_sensor_;
+  text_sensor::TextSensor *hardware_version_text_sensor_;
 
   std::vector<uint8_t> frame_buffer_;
   bool status_notification_received_ = false;

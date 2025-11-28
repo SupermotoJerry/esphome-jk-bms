@@ -146,6 +146,7 @@ void JkBmsBle::dump_config() {  // NOLINT(google-readability-function-size,reada
   LOG_SENSOR("", "Temperature Sensor 5", this->temperatures_[4].temperature_sensor_);
   LOG_SENSOR("", "Balancing", this->balancing_sensor_);
   LOG_SENSOR("", "State Of Charge", this->state_of_charge_sensor_);
+  LOG_SENSOR("", "State Of Health", this->state_of_health_sensor_);
   LOG_SENSOR("", "Capacity Remaining", this->capacity_remaining_sensor_);
   LOG_SENSOR("", "Total Battery Capacity Setting", this->total_battery_capacity_setting_sensor_);
   LOG_SENSOR("", "Charging Cycles", this->charging_cycles_sensor_);
@@ -191,8 +192,7 @@ void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
     case ESP_GATTC_SEARCH_CMPL_EVT: {
       auto *chr = this->parent_->get_characteristic(JK_BMS_SERVICE_UUID, JK_BMS_CHARACTERISTIC_UUID);
       if (chr == nullptr) {
-        ESP_LOGE(TAG, "[%s] No control service found at device, not an JK BMS..?",
-                 this->parent_->address_str().c_str());
+        ESP_LOGE(TAG, "[%s] No control service found at device, not an JK BMS..?", this->parent_->address_str());
         break;
       }
 
@@ -279,7 +279,7 @@ void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
 void JkBmsBle::update() {
   this->track_online_status_();
   if (this->node_state != espbt::ClientState::ESTABLISHED) {
-    ESP_LOGW(TAG, "[%s] Not connected", this->parent_->address_str().c_str());
+    ESP_LOGW(TAG, "[%s] Not connected", this->parent_->address_str());
     return;
   }
 
@@ -571,7 +571,7 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
   this->publish_state_(this->total_charging_cycle_capacity_sensor_, (float) jk_get_32bit(154 + offset) * 0.001f);
 
   // 158   1   0x64                   SOH                  1.0           %
-  ESP_LOGD(TAG, "State of health: %d %%", data[158 + offset]);
+  this->publish_state_(this->state_of_health_sensor_, (float) data[158 + offset]);
 
   // 159   1   0x00                   Precharge
   ESP_LOGD(TAG, "Precharge: %s", ONOFF(data[159 + offset]));
@@ -1305,11 +1305,11 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   // 6    16   0x4A 0x4B 0x5F 0x50 0x42 0x32 0x41 0x31 0x36 0x53 0x31 0x35 0x50 0x00 0x00 0x00
   ESP_LOGI(TAG, "  Vendor ID: %s", std::string(data.begin() + 6, data.begin() + 6 + 16).c_str());
 
-  // 22    8   0x31 0x34 0x2E 0x58 0x41 0x00 0x00 0x00
-  ESP_LOGI(TAG, "  Hardware version: %s", std::string(data.begin() + 22, data.begin() + 22 + 8).c_str());
+  // 22    8   0x31 0x34 0x2E 0x58 0x41 0x00 0x00 0x00    Hardware version
+  this->publish_state_(this->hardware_version_text_sensor_, std::string(data.begin() + 22, data.begin() + 22 + 8));
 
-  // 30    8   0x31 0x34 0x2E 0x32 0x30 0x00 0x00 0x00
-  ESP_LOGI(TAG, "  Software version: %s", std::string(data.begin() + 30, data.begin() + 30 + 8).c_str());
+  // 30    8   0x31 0x34 0x2E 0x32 0x30 0x00 0x00 0x00    Software version
+  this->publish_state_(this->software_version_text_sensor_, std::string(data.begin() + 30, data.begin() + 30 + 8));
 
   // 38    4   0x54 0xE6 0x01 0x00
   ESP_LOGI(TAG, "  Uptime: %lu s", (unsigned long) jk_get_32bit(38));
@@ -1527,7 +1527,7 @@ bool JkBmsBle::write_register(uint8_t address, uint32_t value, uint8_t length) {
                                sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
 
   if (status) {
-    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", this->parent_->address_str().c_str(), status);
+    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", this->parent_->address_str(), status);
   }
 
   return (status == 0);
@@ -1566,6 +1566,7 @@ void JkBmsBle::publish_device_unavailable_() {
   this->publish_state_(power_tube_temperature_sensor_, NAN);
   this->publish_state_(balancing_sensor_, NAN);
   this->publish_state_(state_of_charge_sensor_, NAN);
+  this->publish_state_(state_of_health_sensor_, NAN);
   this->publish_state_(capacity_remaining_sensor_, NAN);
   this->publish_state_(total_battery_capacity_setting_sensor_, NAN);
   this->publish_state_(charging_cycles_sensor_, NAN);

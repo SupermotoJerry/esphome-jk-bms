@@ -304,6 +304,8 @@ sensor:
       name: "${name} balancing"
     state_of_charge:
       name: "${name} state of charge"
+    state_of_health:
+      name: "${name} state of health"
     capacity_remaining:
       name: "${name} capacity remaining"
     total_battery_capacity_setting:
@@ -363,3 +365,7 @@ text_sensor:
       name: "${name} total runtime formatted"
     charge_status:
       name: "${name} charge status"
+    software_version:
+      name: "${name} software version"
+    hardware_version:
+      name: "${name} hardware version"
