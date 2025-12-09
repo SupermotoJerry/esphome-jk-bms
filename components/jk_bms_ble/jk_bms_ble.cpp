@@ -1,5 +1,12 @@
 #include "jk_bms_ble.h"
 #include "esphome/core/log.h"
+#include "esphome/core/version.h"
+
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 12, 0)
+#define ADDR_STR(x) x
+#else
+#define ADDR_STR(x) (x).c_str()
+#endif
 
 #ifdef USE_ESP32
 
@@ -192,7 +199,8 @@ void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
     case ESP_GATTC_SEARCH_CMPL_EVT: {
       auto *chr = this->parent_->get_characteristic(JK_BMS_SERVICE_UUID, JK_BMS_CHARACTERISTIC_UUID);
       if (chr == nullptr) {
-        ESP_LOGE(TAG, "[%s] No control service found at device, not an JK BMS..?", this->parent_->address_str());
+        ESP_LOGE(TAG, "[%s] No control service found at device, not an JK BMS..?",
+                 ADDR_STR(this->parent_->address_str()));
         break;
       }
 
@@ -279,7 +287,7 @@ void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
 void JkBmsBle::update() {
   this->track_online_status_();
   if (this->node_state != espbt::ClientState::ESTABLISHED) {
-    ESP_LOGW(TAG, "[%s] Not connected", this->parent_->address_str());
+    ESP_LOGW(TAG, "[%s] Not connected", ADDR_STR(this->parent_->address_str()));
     return;
   }
 
@@ -1119,7 +1127,12 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
     this->publish_state_(this->timed_stored_data_switch_, check_bit_(data[283], 1));
     this->publish_state_(this->charging_float_mode_switch_, check_bit_(data[283], 2));
 
-    // 284   2   0x00 0x00
+    // 284   1   0x00                   Heating start temperature
+    this->publish_state_(this->heating_start_temperature_number_, (float) ((int8_t) data[284]));
+
+    // 285   1   0x00                   Heating stop temperature
+    this->publish_state_(this->heating_stop_temperature_number_, (float) ((int8_t) data[285]));
+
     // 286   1   0x00
     ESP_LOGI(TAG, "  Smart sleep: %d h", data[286]);
     // 287   1   0x00
@@ -1527,7 +1540,7 @@ bool JkBmsBle::write_register(uint8_t address, uint32_t value, uint8_t length) {
                                sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
 
   if (status) {
-    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", this->parent_->address_str(), status);
+    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
   }
 
   return (status == 0);
