@@ -2,7 +2,6 @@ import esphome.codegen as cg
 from esphome.components import number
 import esphome.config_validation as cv
 from esphome.const import (
-    CONF_ID,
     CONF_MAX_VALUE,
     CONF_MIN_VALUE,
     CONF_MODE,
@@ -32,6 +31,7 @@ CONF_BALANCE_TRIGGER_VOLTAGE = "balance_trigger_voltage"
 CONF_MAX_BALANCE_CURRENT = "max_balance_current"
 CONF_BALANCE_SLEEP_VOLTAGE = "balance_sleep_voltage"
 CONF_BALANCE_START_VOLTAGE = "balance_start_voltage"
+CONF_BALANCE_STOP_DIFF_VOLTAGE = "balance_stop_diff_voltage"
 CONF_NOMINAL_BATTERY_CAPACITY = "nominal_battery_capacity"
 # CONF_BUZZER_MODE = "buzzer_mode"
 # CONF_BATTERY_TYPE = "battery_type"
@@ -72,6 +72,7 @@ NUMBERS = {
     CONF_MAX_BALANCE_CURRENT: 0x03,
     CONF_BALANCE_SLEEP_VOLTAGE: 0x04,
     CONF_BALANCE_START_VOLTAGE: 0x17,
+    CONF_BALANCE_STOP_DIFF_VOLTAGE: 0x1A,
     CONF_NOMINAL_BATTERY_CAPACITY: 0x16,
     # CONF_BUZZER_MODE: 0x14,
     # CONF_BATTERY_TYPE: 0x15,
@@ -142,6 +143,13 @@ CONFIG_SCHEMA = HELTEC_BALANCER_BLE_COMPONENT_SCHEMA.extend(
                 cv.Optional(CONF_STEP, default=0.001): cv.float_,
             }
         ),
+        cv.Optional(CONF_BALANCE_STOP_DIFF_VOLTAGE): HELTEC_NUMBER_SCHEMA.extend(
+            {
+                cv.Optional(CONF_MIN_VALUE, default=0.001): cv.float_,
+                cv.Optional(CONF_MAX_VALUE, default=1.0): cv.float_,
+                cv.Optional(CONF_STEP, default=0.001): cv.float_,
+            }
+        ),
         cv.Optional(CONF_NOMINAL_BATTERY_CAPACITY): HELTEC_NUMBER_SCHEMA.extend(
             {
                 cv.Optional(CONF_MIN_VALUE, default=1): cv.float_,
@@ -161,15 +169,13 @@ async def to_code(config):
     for key, address in NUMBERS.items():
         if key in config:
             conf = config[key]
-            var = cg.new_Pvariable(conf[CONF_ID])
-            await cg.register_component(var, conf)
-            await number.register_number(
-                var,
+            var = await number.new_number(
                 conf,
                 min_value=conf[CONF_MIN_VALUE],
                 max_value=conf[CONF_MAX_VALUE],
                 step=conf[CONF_STEP],
             )
+            await cg.register_component(var, conf)
             cg.add(getattr(hub, f"set_{key}_number")(var))
             cg.add(var.set_parent(hub))
             cg.add(var.set_holding_register(address))

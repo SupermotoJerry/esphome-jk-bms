@@ -42,7 +42,7 @@ static const uint16_t MIN_RESPONSE_SIZE = 20;   // Write acknowledge frame
 static const uint16_t MAX_RESPONSE_SIZE = 300;  // Cell info frame
 
 static const uint8_t OPERATION_STATUS_SIZE = 13;
-static const char *const OPERATION_STATUS[OPERATION_STATUS_SIZE] = {
+static constexpr const char *const OPERATION_STATUS[OPERATION_STATUS_SIZE] = {
     "Unknown",                                   // 0x00
     "Wrong cell count",                          // 0x01
     "AcqLine Res test",                          // 0x02
@@ -59,7 +59,7 @@ static const char *const OPERATION_STATUS[OPERATION_STATUS_SIZE] = {
 };
 
 static const uint8_t BUZZER_MODES_SIZE = 4;
-static const char *const BUZZER_MODES[BUZZER_MODES_SIZE] = {
+static constexpr const char *const BUZZER_MODES[BUZZER_MODES_SIZE] = {
     "Unknown",       // 0x00
     "Off",           // 0x01
     "Beep once",     // 0x02
@@ -67,7 +67,7 @@ static const char *const BUZZER_MODES[BUZZER_MODES_SIZE] = {
 };
 
 static const uint8_t BATTERY_TYPES_SIZE = 5;
-static const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
+static constexpr const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
     "Unknown",  // 0x00
     "NCM",      // 0x01
     "LFP",      // 0x02
@@ -76,7 +76,7 @@ static const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
 };
 
 static const uint8_t CELL_ERRORS_SIZE = 8;
-static const char *const CELL_ERRORS[CELL_ERRORS_SIZE] = {
+static constexpr const char *const CELL_ERRORS[CELL_ERRORS_SIZE] = {
     "Battery detection failed",  "Overvoltage",        "Undervoltage",   "Polarity error",
     "Excessive line resistance", "System overheating", "Charging fault", "Discharge fault",
 };
@@ -247,7 +247,7 @@ void HeltecBalancerBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt
         break;
 
       ESP_LOGVV(TAG, "Notification received: %s",
-                format_hex_pretty(param->notify.value, param->notify.value_len).c_str());
+                format_hex_pretty(param->notify.value, param->notify.value_len).c_str());  // NOLINT
 
       this->assemble(param->notify.value, param->notify.value_len);
 
@@ -279,7 +279,7 @@ void HeltecBalancerBle::assemble(const uint8_t *data, uint16_t length) {
   }
 
   // Flush buffer on every preamble
-  if (data[0] == SOF_RESPONSE_BYTE1 && data[1] == SOF_RESPONSE_BYTE2) {
+  if (length >= 2 && data[0] == SOF_RESPONSE_BYTE1 && data[1] == SOF_RESPONSE_BYTE2) {
     this->frame_buffer_.clear();
   }
 
@@ -322,7 +322,8 @@ void HeltecBalancerBle::decode_(const std::vector<uint8_t> &data) {
       this->decode_settings_(data);
       break;
     case COMMAND_WRITE_REGISTER:
-      ESP_LOGD(TAG, "Write register response received: %s", format_hex_pretty(data.data(), data.size()).c_str());
+      ESP_LOGD(TAG, "Write register response received: %s",
+               format_hex_pretty(data.data(), data.size()).c_str());  // NOLINT
       break;
     default:
       ESP_LOGW(TAG, "Unsupported message type (0x%02X)", data[4]);
@@ -347,8 +348,8 @@ void HeltecBalancerBle::decode_cell_info_(const std::vector<uint8_t> &data) {
   this->last_cell_info_ = now;
 
   ESP_LOGI(TAG, "Cell info frame (%d bytes):", data.size());
-  ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());
-  ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());
+  ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());                      // NOLINT
+  ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());  // NOLINT
 
   // Cell info frame (300 bytes)
   // 0x55 0xAA 0x11 0x01 0x02 0x00 0x2C 0x01 0x38 0xE7 0xFA 0x50 0x40 0xB6 0x04 0x51 0x40 0x85 0x0E 0x51
@@ -553,7 +554,7 @@ void HeltecBalancerBle::decode_settings_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Settings frame (%d bytes):", data.size());
-  ESP_LOGD(TAG, "  %s", format_hex_pretty(data.data(), data.size()).c_str());
+  ESP_LOGD(TAG, "  %s", format_hex_pretty(data.data(), data.size()).c_str());  // NOLINT
 
   // Settings frame (100 bytes)
   // 0x55 0xAA 0x11 0x01 0x04 0x00 0x64 0x00 0x10 0x0A 0xD7 0xA3 0x3B 0x00 0x00 0x80 0x40 0x00 0x00 0x20
@@ -587,16 +588,18 @@ void HeltecBalancerBle::decode_settings_(const std::vector<uint8_t> &data) {
 
   // 22    1   0x01                   Buzzer mode (0x01: Off, 0x02: Beep once, 0x03: Beep regular)
   uint8_t raw_buzzer_mode = data[22];
-  if (raw_buzzer_mode < BUZZER_MODES_SIZE) {
+  if (raw_buzzer_mode > 0 && raw_buzzer_mode < BUZZER_MODES_SIZE) {
     this->publish_state_(this->buzzer_mode_text_sensor_, BUZZER_MODES[raw_buzzer_mode]);
+    this->publish_state_(this->buzzer_mode_select_, BUZZER_MODES[raw_buzzer_mode]);
   } else {
     this->publish_state_(this->buzzer_mode_text_sensor_, "Unknown");
   }
 
   // 23    1   0x02                   Battery type (0x01: NCM, 0x02: LFP, 0x03: LTO, 0x04: PbAc)
   uint8_t raw_battery_type = data[23];
-  if (raw_battery_type < BATTERY_TYPES_SIZE) {
+  if (raw_battery_type > 0 && raw_battery_type < BATTERY_TYPES_SIZE) {
     this->publish_state_(this->battery_type_text_sensor_, BATTERY_TYPES[raw_battery_type]);
+    this->publish_state_(this->battery_type_select_, BATTERY_TYPES[raw_battery_type]);
   } else {
     this->publish_state_(this->battery_type_text_sensor_, "Unknown");
   }
@@ -607,12 +610,18 @@ void HeltecBalancerBle::decode_settings_(const std::vector<uint8_t> &data) {
   // 28    4   0x66 0x66 0x26 0x40    Start balance voltage                        2.6 V
   this->publish_state_(this->balance_start_voltage_number_, ieee_float_(heltec_get_32bit(28)));
 
-  // 32    66  0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+  // 32    1   0x00                   Device address
+  // 33    4   0x00 0x00 0x00 0x00    Stop balance diff voltage                    0.0 V
+  this->publish_state_(this->balance_stop_diff_voltage_number_, ieee_float_(heltec_get_32bit(33)));
+
+  // 37    4   0x00 0x00 0x00 0x00    Line resistance reference
+  // 41    6   0x00 0x00 0x00 0x00 0x00 0x00    Feature flags
+  // 47    4   0x00 0x00 0x00 0x00    Reset current
+  // 51    47  0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
   //           0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-  //           0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-  //           0x00 0x00 0x00 0x00 0x00 0x00
-  // 98    1   0xB7
-  // 99    1   0xFF
+  //           0x00 0x00 0x00 0x00 0x00 0x00 0x00
+  // 98    1   0xB7                   CRC
+  // 99    1   0xFF                   EOF
 }
 
 void HeltecBalancerBle::decode_factory_defaults_(const std::vector<uint8_t> &data) {
@@ -624,7 +633,7 @@ void HeltecBalancerBle::decode_factory_defaults_(const std::vector<uint8_t> &dat
   };
 
   ESP_LOGI(TAG, "Factory defaults frame (%d bytes):", data.size());
-  ESP_LOGD(TAG, "  %s", format_hex_pretty(data.data(), data.size()).c_str());
+  ESP_LOGD(TAG, "  %s", format_hex_pretty(data.data(), data.size()).c_str());  // NOLINT
 
   // Skip the ackowledge frame
   if (data.size() == 20) {
@@ -718,7 +727,7 @@ void HeltecBalancerBle::decode_device_info_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Device info frame (%d bytes):", data.size());
-  ESP_LOGD(TAG, "  %s", format_hex_pretty(data.data(), data.size()).c_str());
+  ESP_LOGD(TAG, "  %s", format_hex_pretty(data.data(), data.size()).c_str());  // NOLINT
 
   // Device info frame (100 bytes)
   // 0x55 0xAA 0x11 0x01 0x01 0x00 0x64 0x00 0x47 0x57 0x2D 0x32 0x34 0x53 0x34 0x45 0x42 0x00 0x00 0x00
@@ -819,7 +828,7 @@ bool HeltecBalancerBle::send_command(uint8_t function, uint8_t command, uint8_t 
   frame[18] = crc(frame, sizeof(frame) - 2);
   frame[19] = END_OF_FRAME;  // End sequence
 
-  ESP_LOGD(TAG, "Write register: %s", format_hex_pretty(frame, sizeof(frame)).c_str());
+  ESP_LOGD(TAG, "Write register: %s", format_hex_pretty(frame, sizeof(frame)).c_str());  // NOLINT
   auto status =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_handle_,
                                sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
@@ -893,6 +902,13 @@ void HeltecBalancerBle::publish_state_(sensor::Sensor *sensor, float value) {
     return;
 
   sensor->publish_state(value);
+}
+
+void HeltecBalancerBle::publish_state_(select::Select *select, const std::string &state) {
+  if (select == nullptr)
+    return;
+
+  select->publish_state(state);
 }
 
 void HeltecBalancerBle::publish_state_(switch_::Switch *obj, const bool &state) {

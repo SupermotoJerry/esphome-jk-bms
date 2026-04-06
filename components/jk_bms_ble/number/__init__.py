@@ -2,7 +2,6 @@ import esphome.codegen as cg
 from esphome.components import number
 import esphome.config_validation as cv
 from esphome.const import (
-    CONF_ID,
     CONF_MAX_VALUE,
     CONF_MIN_VALUE,
     CONF_MODE,
@@ -14,6 +13,7 @@ from esphome.const import (
     UNIT_CELSIUS,
     UNIT_EMPTY,
     UNIT_HOUR,
+    UNIT_PERCENT,
     UNIT_VOLT,
 )
 
@@ -127,6 +127,7 @@ DEFAULT_STEP = 1
 # ...
 # b3 01 14        Requested charge voltage time    2.0 h (20)
 # b4 01 5a        Requested float voltage time     9.0 h (90)
+# b7 01 00        Re-Bulk SOC                        0 % (0)
 
 # https://github.com/syssi/esphome-jk-bms/issues/276#issuecomment-1468145528
 
@@ -142,6 +143,7 @@ CONF_CELL_REQUEST_CHARGE_VOLTAGE = "cell_request_charge_voltage"
 CONF_CELL_REQUEST_FLOAT_VOLTAGE = "cell_request_float_voltage"
 CONF_CELL_REQUEST_CHARGE_VOLTAGE_TIME = "cell_request_charge_voltage_time"
 CONF_CELL_REQUEST_FLOAT_VOLTAGE_TIME = "cell_request_float_voltage_time"
+CONF_RE_BULK_SOC = "re_bulk_soc"
 
 CONF_CELL_COUNT = "cell_count"
 CONF_TOTAL_BATTERY_CAPACITY = "total_battery_capacity"
@@ -176,6 +178,10 @@ CONF_CHARGE_UNDERTEMPERATURE_PROTECTION = "charge_undertemperature_protection"
 CONF_CHARGE_UNDERTMPERATURE_PROTECTION_RECOVERY = (
     "charge_undertemperature_protection_recovery"
 )
+CONF_DISCHARGE_UNDERTEMPERATURE_PROTECTION = "discharge_undertemperature_protection"
+CONF_DISCHARGE_UNDERTEMPERATURE_PROTECTION_RECOVERY = (
+    "discharge_undertemperature_protection_recovery"
+)
 CONF_POWER_TUBE_OVERTEMPERATURE_PROTECTION = "power_tube_overtemperature_protection"
 CONF_POWER_TUBE_OVERTEMPERATURE_PROTECTION_RECOVERY = (
     "power_tube_overtemperature_protection_recovery"
@@ -202,6 +208,7 @@ NUMBERS = {
     CONF_CELL_REQUEST_FLOAT_VOLTAGE: [0x00, 0x0A, 0x0A, 1000.0, 4],
     CONF_CELL_REQUEST_CHARGE_VOLTAGE_TIME: [0x00, 0x00, 0xB3, 10.0, 1],
     CONF_CELL_REQUEST_FLOAT_VOLTAGE_TIME: [0x00, 0x00, 0xB4, 10.0, 1],
+    CONF_RE_BULK_SOC: [0x00, 0x00, 0xB7, 1.0, 1],
     CONF_CELL_COUNT: [0x00, 0x1C, 0x1C, 1.0, 4],
     CONF_TOTAL_BATTERY_CAPACITY: [0x00, 0x20, 0x20, 1000.0, 4],
     CONF_BALANCE_STARTING_VOLTAGE: [0x00, 0x26, 0x22, 1000.0, 4],
@@ -276,6 +283,20 @@ NUMBERS = {
         0x19,
         10.0,
         4,
+    ],
+    CONF_DISCHARGE_UNDERTEMPERATURE_PROTECTION: [
+        0x00,
+        0x00,
+        0x3A,
+        1.0,
+        1,
+    ],
+    CONF_DISCHARGE_UNDERTEMPERATURE_PROTECTION_RECOVERY: [
+        0x00,
+        0x00,
+        0x3B,
+        1.0,
+        1,
     ],
     CONF_POWER_TUBE_OVERTEMPERATURE_PROTECTION: [
         0x00,
@@ -405,6 +426,16 @@ CONFIG_SCHEMA = JK_BMS_BLE_COMPONENT_SCHEMA.extend(
                 cv.Optional(CONF_STEP, default=0.1): cv.float_,
                 cv.Optional(
                     CONF_UNIT_OF_MEASUREMENT, default=UNIT_HOUR
+                ): cv.string_strict,
+            }
+        ),
+        cv.Optional(CONF_RE_BULK_SOC): JK_NUMBER_SCHEMA.extend(
+            {
+                cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
+                cv.Optional(CONF_MAX_VALUE, default=50): cv.float_,
+                cv.Optional(CONF_STEP, default=1.0): cv.float_,
+                cv.Optional(
+                    CONF_UNIT_OF_MEASUREMENT, default=UNIT_PERCENT
                 ): cv.string_strict,
             }
         ),
@@ -624,6 +655,30 @@ CONFIG_SCHEMA = JK_BMS_BLE_COMPONENT_SCHEMA.extend(
             }
         ),
         cv.Optional(
+            CONF_DISCHARGE_UNDERTEMPERATURE_PROTECTION
+        ): JK_NUMBER_SCHEMA.extend(
+            {
+                cv.Optional(CONF_MIN_VALUE, default=-40): cv.float_,
+                cv.Optional(CONF_MAX_VALUE, default=100): cv.float_,
+                cv.Optional(CONF_STEP, default=1.0): cv.float_,
+                cv.Optional(
+                    CONF_UNIT_OF_MEASUREMENT, default=UNIT_CELSIUS
+                ): cv.string_strict,
+            }
+        ),
+        cv.Optional(
+            CONF_DISCHARGE_UNDERTEMPERATURE_PROTECTION_RECOVERY
+        ): JK_NUMBER_SCHEMA.extend(
+            {
+                cv.Optional(CONF_MIN_VALUE, default=-40): cv.float_,
+                cv.Optional(CONF_MAX_VALUE, default=100): cv.float_,
+                cv.Optional(CONF_STEP, default=1.0): cv.float_,
+                cv.Optional(
+                    CONF_UNIT_OF_MEASUREMENT, default=UNIT_CELSIUS
+                ): cv.string_strict,
+            }
+        ),
+        cv.Optional(
             CONF_POWER_TUBE_OVERTEMPERATURE_PROTECTION
         ): JK_NUMBER_SCHEMA.extend(
             {
@@ -686,15 +741,13 @@ async def to_code(config):
     for key, address in NUMBERS.items():
         if key in config:
             conf = config[key]
-            var = cg.new_Pvariable(conf[CONF_ID])
-            await cg.register_component(var, conf)
-            await number.register_number(
-                var,
+            var = await number.new_number(
                 conf,
                 min_value=conf[CONF_MIN_VALUE],
                 max_value=conf[CONF_MAX_VALUE],
                 step=conf[CONF_STEP],
             )
+            await cg.register_component(var, conf)
             cg.add(getattr(hub, f"set_{key}_number")(var))
             cg.add(var.set_parent(hub))
             cg.add(var.set_jk04_holding_register(address[0]))

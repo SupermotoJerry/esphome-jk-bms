@@ -38,7 +38,8 @@ bool JkBmsDisplay::parse_jk_bms_display_byte_(uint8_t byte) {
     return true;
 
   if (at == 1) {
-    if (raw[0] != SOF_BYTE1 || raw[1] != SOF_BYTE2) {
+    // Accept 0xA55A and 0x5AA5 preamble
+    if ((raw[0] != SOF_BYTE1 || raw[1] != SOF_BYTE2) && (raw[0] != SOF_BYTE2 || raw[1] != SOF_BYTE1)) {
       ESP_LOGVV(TAG, "Invalid header: 0x%02X 0x%02X", raw[0], raw[1]);
 
       // return false to reset buffer
@@ -92,7 +93,7 @@ void JkBmsDisplay::on_jk_bms_display_data(const std::vector<uint8_t> &data) {
   }
 
   ESP_LOGW(TAG, "Unhandled response received (frame_type: 0x%02X): %s", frame_type,
-           format_hex_pretty(&data.front(), data.size()).c_str());
+           format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 }
 
 void JkBmsDisplay::on_jk_bms_display_status_data_(const std::vector<uint8_t> &data) {
@@ -101,7 +102,7 @@ void JkBmsDisplay::on_jk_bms_display_status_data_(const std::vector<uint8_t> &da
   };
 
   ESP_LOGI(TAG, "Status frame (%d bytes) received", data.size());
-  ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());
+  ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint8_t offset = 6;
 
@@ -218,7 +219,7 @@ void JkBmsDisplay::on_jk_bms_display_raw_data_(const std::vector<uint8_t> &data)
   };
 
   ESP_LOGD(TAG, "Raw data (%d bytes) received", data.size());
-  ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());
+  ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint16_t address = jk_bms_get_16bit(4);
   uint16_t value = 0;

@@ -7,6 +7,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 
@@ -39,6 +40,9 @@ class HeltecBalancerBle : public esphome::ble_client::BLEClientNode, public Poll
   }
   void set_balance_start_voltage_number(number::Number *balance_start_voltage_number) {
     balance_start_voltage_number_ = balance_start_voltage_number;
+  }
+  void set_balance_stop_diff_voltage_number(number::Number *balance_stop_diff_voltage_number) {
+    balance_stop_diff_voltage_number_ = balance_stop_diff_voltage_number;
   }
   void set_nominal_battery_capacity_number(number::Number *nominal_battery_capacity_number) {
     nominal_battery_capacity_number_ = nominal_battery_capacity_number;
@@ -130,6 +134,8 @@ class HeltecBalancerBle : public esphome::ble_client::BLEClientNode, public Poll
     battery_type_text_sensor_ = battery_type_text_sensor;
   }
 
+  void set_buzzer_mode_select(select::Select *buzzer_mode_select) { buzzer_mode_select_ = buzzer_mode_select; }
+  void set_battery_type_select(select::Select *battery_type_select) { battery_type_select_ = battery_type_select; }
   void set_balancer_switch(switch_::Switch *balancer_switch) { balancer_switch_ = balancer_switch; }
   void assemble(const uint8_t *data, uint16_t length);
   bool send_command(uint8_t function, uint8_t command, uint8_t register_address = 0x00, uint32_t value = 0x00000000);
@@ -140,49 +146,52 @@ class HeltecBalancerBle : public esphome::ble_client::BLEClientNode, public Poll
   } cells_[24];
 
  protected:
-  binary_sensor::BinarySensor *balancing_binary_sensor_;
-  binary_sensor::BinarySensor *error_charging_binary_sensor_;
-  binary_sensor::BinarySensor *error_discharging_binary_sensor_;
-  binary_sensor::BinarySensor *error_system_overheating_binary_sensor_;
-  binary_sensor::BinarySensor *online_status_binary_sensor_;
+  binary_sensor::BinarySensor *balancing_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *error_charging_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *error_discharging_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *error_system_overheating_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *online_status_binary_sensor_{nullptr};
 
-  number::Number *cell_count_number_;
-  number::Number *balance_trigger_voltage_number_;
-  number::Number *max_balance_current_number_;
-  number::Number *balance_sleep_voltage_number_;
-  number::Number *balance_start_voltage_number_;
-  number::Number *nominal_battery_capacity_number_;
+  number::Number *cell_count_number_{nullptr};
+  number::Number *balance_trigger_voltage_number_{nullptr};
+  number::Number *max_balance_current_number_{nullptr};
+  number::Number *balance_sleep_voltage_number_{nullptr};
+  number::Number *balance_start_voltage_number_{nullptr};
+  number::Number *balance_stop_diff_voltage_number_{nullptr};
+  number::Number *nominal_battery_capacity_number_{nullptr};
 
-  sensor::Sensor *min_cell_voltage_sensor_;
-  sensor::Sensor *max_cell_voltage_sensor_;
-  sensor::Sensor *min_voltage_cell_sensor_;
-  sensor::Sensor *max_voltage_cell_sensor_;
-  sensor::Sensor *delta_cell_voltage_sensor_;
-  sensor::Sensor *average_cell_voltage_sensor_;
-  sensor::Sensor *total_voltage_sensor_;
-  sensor::Sensor *temperature_sensor_1_sensor_;
-  sensor::Sensor *temperature_sensor_2_sensor_;
-  sensor::Sensor *total_runtime_sensor_;
-  sensor::Sensor *balancing_current_sensor_;
-  sensor::Sensor *errors_bitmask_sensor_;
-  sensor::Sensor *cell_detection_failed_bitmask_sensor_;
-  sensor::Sensor *cell_overvoltage_bitmask_sensor_;
-  sensor::Sensor *cell_undervoltage_bitmask_sensor_;
-  sensor::Sensor *cell_polarity_error_bitmask_sensor_;
-  sensor::Sensor *cell_excessive_line_resistance_bitmask_sensor_;
+  sensor::Sensor *min_cell_voltage_sensor_{nullptr};
+  sensor::Sensor *max_cell_voltage_sensor_{nullptr};
+  sensor::Sensor *min_voltage_cell_sensor_{nullptr};
+  sensor::Sensor *max_voltage_cell_sensor_{nullptr};
+  sensor::Sensor *delta_cell_voltage_sensor_{nullptr};
+  sensor::Sensor *average_cell_voltage_sensor_{nullptr};
+  sensor::Sensor *total_voltage_sensor_{nullptr};
+  sensor::Sensor *temperature_sensor_1_sensor_{nullptr};
+  sensor::Sensor *temperature_sensor_2_sensor_{nullptr};
+  sensor::Sensor *total_runtime_sensor_{nullptr};
+  sensor::Sensor *balancing_current_sensor_{nullptr};
+  sensor::Sensor *errors_bitmask_sensor_{nullptr};
+  sensor::Sensor *cell_detection_failed_bitmask_sensor_{nullptr};
+  sensor::Sensor *cell_overvoltage_bitmask_sensor_{nullptr};
+  sensor::Sensor *cell_undervoltage_bitmask_sensor_{nullptr};
+  sensor::Sensor *cell_polarity_error_bitmask_sensor_{nullptr};
+  sensor::Sensor *cell_excessive_line_resistance_bitmask_sensor_{nullptr};
 
-  switch_::Switch *balancer_switch_;
+  select::Select *buzzer_mode_select_{nullptr};
+  select::Select *battery_type_select_{nullptr};
+  switch_::Switch *balancer_switch_{nullptr};
 
-  text_sensor::TextSensor *errors_text_sensor_;
-  text_sensor::TextSensor *operation_status_text_sensor_;
-  text_sensor::TextSensor *total_runtime_formatted_text_sensor_;
-  text_sensor::TextSensor *buzzer_mode_text_sensor_;
-  text_sensor::TextSensor *battery_type_text_sensor_;
+  text_sensor::TextSensor *errors_text_sensor_{nullptr};
+  text_sensor::TextSensor *operation_status_text_sensor_{nullptr};
+  text_sensor::TextSensor *total_runtime_formatted_text_sensor_{nullptr};
+  text_sensor::TextSensor *buzzer_mode_text_sensor_{nullptr};
+  text_sensor::TextSensor *battery_type_text_sensor_{nullptr};
 
   std::vector<uint8_t> frame_buffer_;
   bool status_notification_received_ = false;
   uint8_t no_response_count_{0};
-  uint16_t char_handle_;
+  uint16_t char_handle_{0};
   uint32_t last_cell_info_{0};
   uint32_t throttle_;
 
@@ -193,6 +202,7 @@ class HeltecBalancerBle : public esphome::ble_client::BLEClientNode, public Poll
   void decode_factory_defaults_(const std::vector<uint8_t> &data);
   void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
   void publish_state_(number::Number *number, float value);
+  void publish_state_(select::Select *select, const std::string &state);
   void publish_state_(sensor::Sensor *sensor, float value);
   void publish_state_(switch_::Switch *obj, const bool &state);
   void publish_state_(text_sensor::TextSensor *text_sensor, const std::string &state);
@@ -208,8 +218,17 @@ class HeltecBalancerBle : public esphome::ble_client::BLEClientNode, public Poll
     int days = seconds / (24 * 3600);
     seconds = seconds % (24 * 3600);
     int hours = seconds / 3600;
-    return (years ? to_string(years) + "y " : "") + (days ? to_string(days) + "d " : "") +
-           (hours ? to_string(hours) + "h" : "");
+
+    char buf[16];
+    int len = 0;
+    if (years)
+      len += snprintf(buf + len, sizeof(buf) - len, "%dy ", years);
+    if (days)
+      len += snprintf(buf + len, sizeof(buf) - len, "%dd ", days);
+    if (hours)
+      len += snprintf(buf + len, sizeof(buf) - len, "%dh", hours);
+
+    return std::string(buf, len);
   }
 
   float ieee_float_(uint32_t f) {

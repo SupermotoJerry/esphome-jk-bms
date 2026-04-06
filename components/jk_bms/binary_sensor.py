@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 from esphome.components import binary_sensor
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, DEVICE_CLASS_CONNECTIVITY, ENTITY_CATEGORY_DIAGNOSTIC
+from esphome.const import DEVICE_CLASS_CONNECTIVITY, ENTITY_CATEGORY_DIAGNOSTIC
 
 from . import CONF_JK_BMS_ID, JK_BMS_COMPONENT_SCHEMA
 from .const import CONF_CHARGING, CONF_DISCHARGING
@@ -29,53 +29,32 @@ ICON_BALANCING = "mdi:battery-heart-variant"
 ICON_BALANCING_SWITCH = "mdi:battery-heart-variant"
 ICON_DEDICATED_CHARGER_SWITCH = "mdi:battery-charging"
 
-BINARY_SENSORS = [
-    CONF_CHARGING,
-    CONF_CHARGING_SWITCH,
-    CONF_DISCHARGING,
-    CONF_DISCHARGING_SWITCH,
-    CONF_BALANCING,
-    CONF_BALANCING_SWITCH,
-    CONF_DEDICATED_CHARGER_SWITCH,
-    CONF_ONLINE_STATUS,
-]
+BINARY_SENSOR_DEFS = {
+    CONF_CHARGING: {"icon": ICON_CHARGING},
+    CONF_CHARGING_SWITCH: {"icon": ICON_CHARGING_SWITCH},
+    CONF_DISCHARGING: {"icon": ICON_DISCHARGING},
+    CONF_DISCHARGING_SWITCH: {"icon": ICON_DISCHARGING_SWITCH},
+    CONF_BALANCING: {"icon": ICON_BALANCING},
+    CONF_BALANCING_SWITCH: {"icon": ICON_BALANCING_SWITCH},
+    CONF_DEDICATED_CHARGER_SWITCH: {"icon": ICON_DEDICATED_CHARGER_SWITCH},
+    CONF_ONLINE_STATUS: {
+        "device_class": DEVICE_CLASS_CONNECTIVITY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+    },
+}
 
 CONFIG_SCHEMA = JK_BMS_COMPONENT_SCHEMA.extend(
     {
-        cv.Optional(CONF_CHARGING): binary_sensor.binary_sensor_schema(
-            icon=ICON_CHARGING
-        ),
-        cv.Optional(CONF_CHARGING_SWITCH): binary_sensor.binary_sensor_schema(
-            icon=ICON_CHARGING_SWITCH
-        ),
-        cv.Optional(CONF_DISCHARGING): binary_sensor.binary_sensor_schema(
-            icon=ICON_DISCHARGING
-        ),
-        cv.Optional(CONF_DISCHARGING_SWITCH): binary_sensor.binary_sensor_schema(
-            icon=ICON_DISCHARGING_SWITCH
-        ),
-        cv.Optional(CONF_BALANCING): binary_sensor.binary_sensor_schema(
-            icon=ICON_BALANCING
-        ),
-        cv.Optional(CONF_BALANCING_SWITCH): binary_sensor.binary_sensor_schema(
-            icon=ICON_BALANCING_SWITCH
-        ),
-        cv.Optional(CONF_DEDICATED_CHARGER_SWITCH): binary_sensor.binary_sensor_schema(
-            icon=ICON_DEDICATED_CHARGER_SWITCH
-        ),
-        cv.Optional(CONF_ONLINE_STATUS): binary_sensor.binary_sensor_schema(
-            device_class=DEVICE_CLASS_CONNECTIVITY,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-        ),
+        cv.Optional(key): binary_sensor.binary_sensor_schema(**kwargs)
+        for key, kwargs in BINARY_SENSOR_DEFS.items()
     }
 )
 
 
 async def to_code(config):
     hub = await cg.get_variable(config[CONF_JK_BMS_ID])
-    for key in BINARY_SENSORS:
+    for key in BINARY_SENSOR_DEFS:
         if key in config:
             conf = config[key]
-            sens = cg.new_Pvariable(conf[CONF_ID])
-            await binary_sensor.register_binary_sensor(sens, conf)
+            sens = await binary_sensor.new_binary_sensor(conf)
             cg.add(getattr(hub, f"set_{key}_binary_sensor")(sens))

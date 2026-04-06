@@ -31,7 +31,7 @@ static const uint16_t MIN_RESPONSE_SIZE = 300;
 static const uint16_t MAX_RESPONSE_SIZE = 384 + 16;
 
 static const uint8_t ERRORS_SIZE = 16;
-static const char *const ERRORS[ERRORS_SIZE] = {
+static constexpr const char *const ERRORS[ERRORS_SIZE] = {
     "Charge Overtemperature",               // 0000 0000 0000 0001
     "Charge Undertemperature",              // 0000 0000 0000 0010
     "Coprocessor communication error",      // 0000 0000 0000 0100
@@ -170,6 +170,8 @@ void JkBmsBle::dump_config() {  // NOLINT(google-readability-function-size,reada
   LOG_TEXT_SENSOR("", "Total Runtime Formatted", this->total_runtime_formatted_text_sensor_);
   LOG_TEXT_SENSOR("", "Errors", this->errors_text_sensor_);
   LOG_TEXT_SENSOR("", "Charge Status", this->charge_status_text_sensor_);
+  LOG_TEXT_SENSOR("", "Software Version", this->software_version_text_sensor_);
+  LOG_TEXT_SENSOR("", "Hardware Version", this->hardware_version_text_sensor_);
 }
 
 void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if,
@@ -273,7 +275,7 @@ void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
         break;
 
       ESP_LOGVV(TAG, "Notification received: %s",
-                format_hex_pretty(param->notify.value, param->notify.value_len).c_str());
+                format_hex_pretty(param->notify.value, param->notify.value_len).c_str());  // NOLINT
 
       this->assemble(param->notify.value, param->notify.value_len);
 
@@ -305,7 +307,7 @@ void JkBmsBle::assemble(const uint8_t *data, uint16_t length) {
   }
 
   // Flush buffer on every preamble
-  if (data[0] == 0x55 && data[1] == 0xAA && data[2] == 0xEB && data[3] == 0x90) {
+  if (length >= 4 && data[0] == 0x55 && data[1] == 0xAA && data[2] == 0xEB && data[3] == 0x90) {
     this->frame_buffer_.clear();
   }
 
@@ -378,8 +380,8 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
   }
 
   ESP_LOGI(TAG, "Cell info frame (version %d, %d bytes) received", frame_version, data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());                      // NOLINT
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());  // NOLINT
 
   // 6 example responses (128+128+44 = 300 bytes per frame)
   //
@@ -686,8 +688,8 @@ void JkBmsBle::decode_jk04_cell_info_(const std::vector<uint8_t> &data) {
   this->last_cell_info_ = now;
 
   ESP_LOGI(TAG, "Cell info frame (JK04, %d bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());                      // NOLINT
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());  // NOLINT
 
   // 0x55 0xAA 0xEB 0x90 0x02 0x4B 0xC0 0x61 0x56 0x40 0x1F 0xAA 0x56 0x40 0xFF 0x91 0x56 0x40 0xFF 0x91 0x56 0x40 0x1F
   // 0xAA 0x56 0x40 0xFF 0x91 0x56 0x40 0xFF 0x91 0x56 0x40 0xFF 0x91 0x56 0x40 0x1F 0xAA 0x56 0x40 0xFF 0x91 0x56 0x40
@@ -870,8 +872,8 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Settings frame (%d bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
 
   // JK02_24S response example:
   //
@@ -1138,8 +1140,20 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
     // 287   1   0x00
     ESP_LOGI(TAG, "  Data field enable control 0: %d", data[287]);
     // 288   2   0x00 0x00
+    ESP_LOGVV(TAG, "  Unknown288: 0x%02X 0x%02X", data[288], data[289]);
     // 290   4   0x00 0x00 0x00 0x00
-    // 294   4   0x00 0x00 0x00 0x00
+    ESP_LOGVV(TAG, "  Unknown290: 0x%02X 0x%02X 0x%02X 0x%02X", data[290], data[291], data[292], data[293]);
+    // 294   2   0x00 0x00
+    ESP_LOGVV(TAG, "  Unknown294: 0x%02X 0x%02X", data[294], data[295]);
+
+    // 296   1   0x00                   Discharge UTP
+    ESP_LOGV(TAG, "  Discharge UTP: %d °C", (int8_t) data[296]);
+    this->publish_state_(this->discharge_undertemperature_protection_number_, (float) ((int8_t) data[296]));
+
+    // 297   1   0x00                   Discharge UTP Recovery
+    ESP_LOGV(TAG, "  Discharge UTP recovery: %d °C", (int8_t) data[297]);
+    this->publish_state_(this->discharge_undertemperature_protection_recovery_number_, (float) ((int8_t) data[297]));
+
     // 298   1   0x00
     // 299   1   0x40                   CRC
   }
@@ -1152,8 +1166,8 @@ void JkBmsBle::decode_jk04_settings_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Settings frame (JK04, %d bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
 
   // JK04 (JK-B2A16S v3) response example:
   //
@@ -1243,8 +1257,8 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Device info frame (%d bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
 
   // JK04 (JK-B2A16S v3) response example:
   //
@@ -1319,10 +1333,16 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   ESP_LOGI(TAG, "  Vendor ID: %s", std::string(data.begin() + 6, data.begin() + 6 + 16).c_str());
 
   // 22    8   0x31 0x34 0x2E 0x58 0x41 0x00 0x00 0x00    Hardware version
-  this->publish_state_(this->hardware_version_text_sensor_, std::string(data.begin() + 22, data.begin() + 22 + 8));
+  auto hardware_version_begin = data.begin() + 22;
+  this->publish_state_(
+      this->hardware_version_text_sensor_,
+      std::string(hardware_version_begin, std::find(hardware_version_begin, hardware_version_begin + 8, '\0')));
 
   // 30    8   0x31 0x34 0x2E 0x32 0x30 0x00 0x00 0x00    Software version
-  this->publish_state_(this->software_version_text_sensor_, std::string(data.begin() + 30, data.begin() + 30 + 8));
+  auto software_version_begin = data.begin() + 30;
+  this->publish_state_(
+      this->software_version_text_sensor_,
+      std::string(software_version_begin, std::find(software_version_begin, software_version_begin + 8, '\0')));
 
   // 38    4   0x54 0xE6 0x01 0x00
   ESP_LOGI(TAG, "  Uptime: %lu s", (unsigned long) jk_get_32bit(38));
@@ -1487,7 +1507,9 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   // 275  0x00
   // 276  0x00
   // 277  0x00
-  // 278  0x00
+  // 278  0x00  Re-Bulk SOC  %
+  ESP_LOGI(TAG, "  Re-Bulk SOC: %d %%", data[278]);
+  this->publish_state_(this->re_bulk_soc_number_, (float) data[278]);
   // 279  0x00
   // 280  0x00
   // 281  0x00
@@ -1534,7 +1556,7 @@ bool JkBmsBle::write_register(uint8_t address, uint32_t value, uint8_t length) {
   frame[18] = 0x00;
   frame[19] = crc(frame, sizeof(frame) - 1);
 
-  ESP_LOGD(TAG, "Write register: %s", format_hex_pretty(frame, sizeof(frame)).c_str());
+  ESP_LOGD(TAG, "Write register: %s", format_hex_pretty(frame, sizeof(frame)).c_str());  // NOLINT
   auto status =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_handle_,
                                sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
@@ -1653,6 +1675,12 @@ std::string JkBmsBle::error_bits_to_string_(const uint16_t mask) {
   return errors_list;
 }
 
+static std::string unknown_to_string(const uint8_t value) {
+  char buf[15];
+  snprintf(buf, sizeof(buf), "Unknown (0x%02X)", value);
+  return buf;
+}
+
 std::string JkBmsBle::charge_status_id_to_string_(const uint8_t status) {
   switch (status) {
     case 0x00:
@@ -1662,7 +1690,7 @@ std::string JkBmsBle::charge_status_id_to_string_(const uint8_t status) {
     case 0x02:
       return "Float";
     default:
-      return str_snprintf("Unknown (0x%02X)", 15, status);
+      return unknown_to_string(status);
   }
 }
 

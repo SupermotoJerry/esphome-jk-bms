@@ -13,7 +13,7 @@ static const uint8_t FUNCTION_READ_ALL = 0x06;
 static const uint8_t FUNCTION_WRITE_REGISTER = 0x02;
 
 static const uint8_t ERRORS_SIZE = 14;
-static const char *const ERRORS[ERRORS_SIZE] = {
+static constexpr const char *const ERRORS[ERRORS_SIZE] = {
     "Low capacity",                              // Byte 0.0, warning
     "Power tube overtemperature",                // Byte 0.1, alarm
     "Charging overvoltage",                      // Byte 0.2, alarm
@@ -31,7 +31,7 @@ static const char *const ERRORS[ERRORS_SIZE] = {
 };
 
 static const uint8_t OPERATION_MODES_SIZE = 4;
-static const char *const OPERATION_MODES[OPERATION_MODES_SIZE] = {
+static constexpr const char *const OPERATION_MODES[OPERATION_MODES_SIZE] = {
     "Charging enabled",     // 0x00
     "Discharging enabled",  // 0x01
     "Balancer enabled",     // 0x02
@@ -39,7 +39,7 @@ static const char *const OPERATION_MODES[OPERATION_MODES_SIZE] = {
 };
 
 static const uint8_t BATTERY_TYPES_SIZE = 3;
-static const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
+static constexpr const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
     "Lithium Iron Phosphate",  // 0x00
     "Ternary Lithium",         // 0x01
     "Lithium Titanate",        // 0x02
@@ -54,12 +54,16 @@ void JkBms::on_jk_modbus_data(const uint8_t &function, const std::vector<uint8_t
   }
 
   if (function == FUNCTION_WRITE_REGISTER) {
+    if (data.empty()) {
+      ESP_LOGW(TAG, "Write register response is empty");
+      return;
+    }
     ESP_LOGI(TAG, "Register 0x%02X updated", data[0]);
     return;
   }
 
   ESP_LOGW(TAG, "Unhandled response (%zu bytes) received: %s", data.size(),
-           format_hex_pretty(&data.front(), data.size()).c_str());
+           format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 }
 
 void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
@@ -68,7 +72,12 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
     return (uint32_t(jk_get_16bit(i + 0)) << 16) | (uint32_t(jk_get_16bit(i + 2)) << 0);
   };
 
-  ESP_LOGI(TAG, "Status frame received");
+  ESP_LOGI(TAG, "Status frame (%zu bytes) received", data.size());
+
+  if (data.size() < 2) {
+    ESP_LOGW(TAG, "Status frame too short (%zu bytes)", data.size());
+    return;
+  }
 
   // Status request
   // -> 0x4E 0x57 0x00 0x13 0x00 0x00 0x00 0x00 0x06 0x03 0x00 0x00 0x00 0x00 0x00 0x00 0x68 0x00 0x00 0x01 0x29
@@ -97,6 +106,11 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   // 0x0E 0x0E 0xF2: Cell 14        3826 * 0.001 = 3.826V                        0.001 V
   uint8_t cells = data[1] / 3;
 
+  if (data.size() < (size_t) (data[1] + 223)) {
+    ESP_LOGW(TAG, "Status frame too short (%zu bytes) for %d cells", data.size(), cells);
+    return;
+  }
+
   float min_cell_voltage = 100.0f;
   float max_cell_voltage = -100.0f;
   float average_cell_voltage = 0.0f;
@@ -115,7 +129,8 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
     }
     this->publish_state_(this->cells_[i].cell_voltage_sensor_, cell_voltage);
   }
-  average_cell_voltage = average_cell_voltage / cells;
+  if (cells > 0)
+    average_cell_voltage = average_cell_voltage / cells;
 
   this->publish_state_(this->min_cell_voltage_sensor_, min_cell_voltage);
   this->publish_state_(this->max_cell_voltage_sensor_, max_cell_voltage);
@@ -344,15 +359,17 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   this->publish_state_(this->alarm_low_volume_sensor_, (float) data[offset + 23 + 3 * 38]);
 
   // 0xB2 0x31 0x32 0x33 0x34 0x35 0x36 0x00 0x00 0x00 0x00: Modify parameter password
+  auto password_begin = data.begin() + offset + 25 + 3 * 38;
   this->publish_state_(this->password_text_sensor_,
-                       std::string(data.begin() + offset + 25 + 3 * 38, data.begin() + offset + 35 + 3 * 38));
+                       std::string(password_begin, std::find(password_begin, password_begin + 10, '\0')));
 
   // 0xB3 0x00: Dedicated charger switch                                     1 (on)         Bool       0 (off), 1 (on)
   this->publish_state_(this->dedicated_charger_switch_binary_sensor_, (bool) data[offset + 36 + 3 * 38]);
 
   // 0xB4 0x49 0x6E 0x70 0x75 0x74 0x20 0x55 0x73: Device ID code
+  auto device_type_begin = data.begin() + offset + 38 + 3 * 38;
   this->publish_state_(this->device_type_text_sensor_,
-                       std::string(data.begin() + offset + 38 + 3 * 38, data.begin() + offset + 46 + 3 * 38));
+                       std::string(device_type_begin, std::find(device_type_begin, device_type_begin + 8, '\0')));
 
   // 0xB5 0x32 0x31 0x30 0x31: Date of manufacture
   // 0xB6 0x00 0x00 0xE2 0x00: System working hours
@@ -362,8 +379,10 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
 
   // 0xB7 0x48 0x36 0x2E 0x58 0x5F 0x5F 0x53
   //      0x36 0x2E 0x31 0x2E 0x33 0x53 0x5F 0x5F: Software version number
-  this->publish_state_(this->software_version_text_sensor_,
-                       std::string(data.begin() + offset + 51 + 3 * 40, data.begin() + offset + 51 + 3 * 45));
+  auto software_version_begin = data.begin() + offset + 51 + 3 * 40;
+  this->publish_state_(
+      this->software_version_text_sensor_,
+      std::string(software_version_begin, std::find(software_version_begin, software_version_begin + 15, '\0')));
 
   // 0xB8 0x00: Whether to start current calibration
   // 0xB9 0x00 0x00 0x00 0x00: Actual battery capacity
@@ -373,8 +392,9 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
 
   // 0xBA 0x42 0x54 0x33 0x30 0x37 0x32 0x30 0x32 0x30 0x31 0x32 0x30
   //      0x30 0x30 0x30 0x32 0x30 0x30 0x35 0x32 0x31 0x30 0x30 0x31: Manufacturer ID naming
+  auto manufacturer_begin = data.begin() + offset + 59 + 3 * 45;
   this->publish_state_(this->manufacturer_text_sensor_,
-                       std::string(data.begin() + offset + 59 + 3 * 45, data.begin() + offset + 83 + 3 * 45));
+                       std::string(manufacturer_begin, std::find(manufacturer_begin, manufacturer_begin + 24, '\0')));
 
   // 0xC0 0x01: Protocol version number
   this->publish_state_(this->protocol_version_sensor_, (float) data[offset + 84 + 3 * 45]);

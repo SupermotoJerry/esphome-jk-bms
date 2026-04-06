@@ -10,11 +10,11 @@ substitutions:
 
 esphome:
   name: ${name}
+  friendly_name: ${name}
   comment: ${device_description}
-  min_version: 2024.6.0
   project:
     name: "syssi.esphome-jk-bms"
-    version: 2.3.0
+    version: 2.4.0
 
 esp32:
   board: wemos_d1_mini32
@@ -67,16 +67,16 @@ sensor:
   - platform: jk_bms_ble
     jk_bms_ble_id: bms0
     total_voltage:
-      name: "${name} total voltage"
+      name: "total voltage"
     current:
-      name: "${name} current"
+      name: "current"
     power:
-      name: "${name} power"
+      name: "power"
     charging_power:
-      name: "${name} charging power"
+      name: "charging power"
       id: bms0_charging_power
     discharging_power:
-      name: "${name} discharging power"
+      name: "discharging power"
       id: bms0_discharging_power
 
   - platform: total_daily_energy
@@ -103,4 +103,4 @@ switch:
   - platform: ble_client
     ble_client_id: client0
     id: ble_client_switch0
-    name: "${name} enable bluetooth connection"
+    name: "enable bluetooth connection"
