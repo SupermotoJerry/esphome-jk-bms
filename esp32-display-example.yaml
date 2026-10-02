@@ -26,7 +26,7 @@ esphome:
   comment: ${device_description}
   project:
     name: "syssi.esphome-jk-bms"
-    version: 2.4.0
+    version: 3.0.0
 
 esp32:
   board: wemos_d1_mini32
@@ -40,6 +40,7 @@ external_components:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  min_auth_mode: WPA2
 
 ota:
   platform: esphome

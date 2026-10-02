@@ -2,8 +2,13 @@
 #include <cstdint>
 #include <vector>
 #include "esphome/components/jk_bms/jk_bms.h"
+#include "esphome/components/switch/switch.h"
 
 namespace esphome::jk_bms::testing {
+
+struct TestSwitch : switch_::Switch {
+  void write_state(bool) override {}
+};
 
 class TestableJkBms : public JkBms {
  public:
@@ -17,10 +22,10 @@ class TestableJkBms : public JkBms {
 //   min_cell_voltage: 3.811 V (cell 9)   max_cell_voltage: 3.835 V (cell 12)
 //   delta_cell_voltage: 0.024 V          average_cell_voltage: 3.82821 V
 //   total_voltage: 53.59 V               current: 2.08 A (charging, protocol version 1)
-//   power_tube_temperature: 29°C         temperature_sensor_1: 30°C  temperature_sensor_2: 28°C
-//   capacity_remaining: 15 %             total_battery_capacity: 14 Ah
+//   mosfet_temperature: 29°C         temperature_sensor_1: 30°C  temperature_sensor_2: 28°C
+//   state_of_charge: 15 %                total_battery_capacity: 14 Ah
 //   errors_bitmask: 0                    operation_modes: charging+discharging+balancer (0x07)
-//   battery_strings: 14                  charging_cycles: 4
+//   cell_count: 14                        charging_cycles: 4
 //   software_version: "H6.X__S6.1.3S__" total_runtime: 57856 min ("40d 4h")
 //   balancing_switch: on                 charging_switch: on  discharging_switch: on
 static const std::vector<uint8_t> STATUS_FRAME_14S = {
@@ -71,7 +76,7 @@ static const std::vector<uint8_t> STATUS_FRAME_14S = {
     0x0E,
     0xF2,  // cell 14: 3826 → 3.826 V
     // offset = data[1] + 3 = 42 + 3 = 45
-    // bytes 44-46: power tube temperature = 29°C
+    // bytes 44-46: mosfet temperature = 29°C
     0x80,
     0x00,
     0x1D,
@@ -94,7 +99,7 @@ static const std::vector<uint8_t> STATUS_FRAME_14S = {
     // bytes 59-60: capacity remaining = 15 %
     0x85,
     0x0F,
-    // bytes 61-62: temperature sensors count = 2
+    // bytes 61-62: temperature sensor count = 2
     0x86,
     0x02,
     // bytes 63-65: charging cycles = 4
@@ -107,7 +112,7 @@ static const std::vector<uint8_t> STATUS_FRAME_14S = {
     0x00,
     0x00,
     0x00,
-    // bytes 71-73: battery strings = 14
+    // bytes 71-73: cell count = 14
     0x8A,
     0x00,
     0x0E,
@@ -171,58 +176,58 @@ static const std::vector<uint8_t> STATUS_FRAME_14S = {
     0x9A,
     0x00,
     0x05,
-    // bytes 119-121: balance starting voltage = 3300 × 0.001 = 3.300 V
+    // bytes 119-121: balancing start voltage = 3300 × 0.001 = 3.300 V
     0x9B,
     0x0C,
     0xE4,
-    // bytes 122-124: balance opening pressure difference = 8 × 0.001 = 0.008 V
+    // bytes 122-124: balancing delta voltage = 8 × 0.001 = 0.008 V
     0x9C,
     0x00,
     0x08,
     // bytes 125-126: balancing switch = on
     0x9D,
     0x01,
-    // bytes 127-129: power tube temperature protection = 90°C
+    // bytes 127-129: mosfet overtemperature protection = 90°C
     0x9E,
     0x00,
     0x5A,
-    // bytes 130-132: power tube temperature recovery = 70°C
+    // bytes 130-132: mosfet overtemperature recovery = 70°C
     0x9F,
     0x00,
     0x46,
-    // bytes 133-135: temperature sensor temperature protection = 100°C
+    // bytes 133-135: battery overtemperature protection = 100°C
     0xA0,
     0x00,
     0x64,
-    // bytes 136-138: temperature sensor temperature recovery = 100°C
+    // bytes 136-138: battery overtemperature recovery = 100°C
     0xA1,
     0x00,
     0x64,
-    // bytes 139-141: temperature sensor temperature difference protection = 20°C
+    // bytes 139-141: battery temperature difference protection = 20°C
     0xA2,
     0x00,
     0x14,
-    // bytes 142-144: charging high temperature protection = 70°C
+    // bytes 142-144: charging overtemperature protection = 70°C
     0xA3,
     0x00,
     0x46,
-    // bytes 145-147: discharging high temperature protection = 70°C
+    // bytes 145-147: discharging overtemperature protection = 70°C
     0xA4,
     0x00,
     0x46,
-    // bytes 148-150: charging low temperature protection = (int16_t)0xFFEC = -20°C
+    // bytes 148-150: charging undertemperature protection = (int16_t)0xFFEC = -20°C
     0xA5,
     0xFF,
     0xEC,
-    // bytes 151-153: charging low temperature recovery = (int16_t)0xFFF6 = -10°C
+    // bytes 151-153: charging undertemperature recovery = (int16_t)0xFFF6 = -10°C
     0xA6,
     0xFF,
     0xF6,
-    // bytes 154-156: discharging low temperature protection = -20°C
+    // bytes 154-156: discharging undertemperature protection = -20°C
     0xA7,
     0xFF,
     0xEC,
-    // bytes 157-159: discharging low temperature recovery = -10°C
+    // bytes 157-159: discharging undertemperature recovery = -10°C
     0xA8,
     0xFF,
     0xF6,
@@ -255,7 +260,7 @@ static const std::vector<uint8_t> STATUS_FRAME_14S = {
     0xB0,
     0x00,
     0x0A,
-    // bytes 181-182: alarm low volume = 20 %
+    // bytes 181-182: low_soc_alarm_threshold = 20 %
     0xB1,
     0x14,
     // bytes 183-193: password = "123456" (10 bytes, null-padded)

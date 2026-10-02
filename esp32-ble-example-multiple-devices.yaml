@@ -4,8 +4,6 @@ substitutions:
   bms1: "${name} bms1"
   device_description: "Monitor and control a JK-BMS via bluetooth"
   external_components_source: github://syssi/esphome-jk-bms@main
-  bms0_mac_address: C8:47:8C:E1:E2:AA
-  bms1_mac_address: C8:47:8C:E1:E2:BB
   # Please use "JK02_24S" if you own a old JK-BMS < hardware version 11.0 (hardware version >= 6.0 and < 11.0)
   # Please use "JK02_32S" if you own a new JK-BMS >= hardware version 11.0 (f.e. JK-B2A8S20P hw 11.XW, sw 11.26)
   # Please use "JK04" if you have some old JK-BMS <= hardware version 3.0 (f.e. JK-B2A16S hw 3.0, sw. 3.3.0)
@@ -18,7 +16,7 @@ esphome:
   comment: ${device_description}
   project:
     name: "syssi.esphome-jk-bms"
-    version: 2.4.0
+    version: 3.0.0
   devices:
     - id: device0
       name: "${bms0}"
@@ -37,6 +35,7 @@ external_components:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  min_auth_mode: WPA2
 
 ota:
   platform: esphome
@@ -66,9 +65,9 @@ esp32_ble_tracker:
     active: false
 
 ble_client:
-  - mac_address: ${bms0_mac_address}
+  - mac_address: !secret bms0_mac_address
     id: client0
-  - mac_address: ${bms1_mac_address}
+  - mac_address: !secret bms1_mac_address
     id: client1
 
 jk_bms_ble:
@@ -76,6 +75,11 @@ jk_bms_ble:
     protocol_version: ${bms0_protocol_version}
     throttle: 5s
     id: bms0
+    # Override the label of one or more error bits (bit 0-31, JK02 only).
+    # An empty label suppresses the bit entirely.
+    #
+    # error_overrides:
+    #   4: "Cell overvoltage"
   - ble_client_id: client1
     protocol_version: ${bms1_protocol_version}
     throttle: 5s
@@ -121,6 +125,18 @@ button:
     retrieve_device_info:
       name: "retrieve device info"
       device_id: device0
+    retrieve_logbook:
+      name: "retrieve logbook"
+      device_id: device0
+    shutdown:
+      name: "shutdown"
+      device_id: device0
+    restart:
+      name: "restart"
+      device_id: device0
+    factory_reset:
+      name: "factory reset"
+      device_id: device0
 
   - platform: jk_bms_ble
     jk_bms_ble_id: bms1
@@ -130,6 +146,18 @@ button:
     retrieve_device_info:
       name: "retrieve device info"
       device_id: device1
+    retrieve_logbook:
+      name: "retrieve logbook"
+      device_id: device1
+    shutdown:
+      name: "shutdown"
+      device_id: device1
+    restart:
+      name: "restart"
+      device_id: device1
+    factory_reset:
+      name: "factory reset"
+      device_id: device1
 
 number:
   - platform: jk_bms_ble
@@ -137,8 +165,8 @@ number:
     balance_trigger_voltage:
       name: "balance trigger voltage"
       device_id: device0
-    balance_starting_voltage:
-      name: "balance starting voltage"
+    balancing_start_voltage:
+      name: "balancing start voltage"
       device_id: device0
     power_off_voltage:
       name: "power off voltage"
@@ -150,8 +178,8 @@ number:
     balance_trigger_voltage:
       name: "balance trigger voltage"
       device_id: device1
-    balance_starting_voltage:
-      name: "balance starting voltage"
+    balancing_start_voltage:
+      name: "balancing start voltage"
       device_id: device1
     power_off_voltage:
       name: "power off voltage"
@@ -176,8 +204,8 @@ sensor:
     power:
       name: "power"
       device_id: device0
-    power_tube_temperature:
-      name: "power tube temperature"
+    mosfet_temperature:
+      name: "mosfet temperature"
       device_id: device0
     # ...
 
@@ -198,8 +226,8 @@ sensor:
     power:
       name: "power"
       device_id: device1
-    power_tube_temperature:
-      name: "power tube temperature"
+    mosfet_temperature:
+      name: "mosfet temperature"
       device_id: device1
     # ...
 
@@ -239,11 +267,26 @@ switch:
     id: ble_client_switch1
     device_id: device1
 
+select:
+  - platform: jk_bms_ble
+    jk_bms_ble_id: bms0
+    load_config_preset:
+      name: "load config preset"
+      device_id: device0
+  - platform: jk_bms_ble
+    jk_bms_ble_id: bms1
+    load_config_preset:
+      name: "load config preset"
+      device_id: device1
+
 text_sensor:
   - platform: jk_bms_ble
     jk_bms_ble_id: bms0
     errors:
       name: "errors"
+      device_id: device0
+    errors_bitmask_hex:
+      name: "errors bitmask hex"
       device_id: device0
     total_runtime_formatted:
       name: "total runtime formatted"
@@ -253,6 +296,15 @@ text_sensor:
       device_id: device0
     hardware_version:
       name: "hardware version"
+      device_id: device0
+    device_model:
+      name: "device model"
+      device_id: device0
+    manufacturing_date:
+      name: "manufacturing date"
+      device_id: device0
+    serial_number:
+      name: "serial number"
       device_id: device0
 
   - platform: jk_bms_ble
@@ -260,6 +312,9 @@ text_sensor:
     errors:
       name: "errors"
       device_id: device1
+    errors_bitmask_hex:
+      name: "errors bitmask hex"
+      device_id: device1
     total_runtime_formatted:
       name: "total runtime formatted"
       device_id: device1
@@ -268,4 +323,13 @@ text_sensor:
       device_id: device1
     hardware_version:
       name: "hardware version"
+      device_id: device1
+    device_model:
+      name: "device model"
+      device_id: device1
+    manufacturing_date:
+      name: "manufacturing date"
+      device_id: device1
+    serial_number:
+      name: "serial number"
       device_id: device1

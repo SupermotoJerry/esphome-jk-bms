@@ -11,7 +11,7 @@ esphome:
   comment: ${device_description}
   project:
     name: "syssi.esphome-jk-bms"
-    version: 2.4.0
+    version: 3.0.0
 
 esp32:
   board: wemos_d1_mini32
@@ -25,6 +25,7 @@ external_components:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  min_auth_mode: WPA2
 
 ota:
   platform: esphome
@@ -59,6 +60,11 @@ jk_balancer:
     jk_balancer_modbus_id: modbus0
     address: 0x01
     update_interval: 5s
+    # Override the label of one or more error bits (bit 0-7).
+    # An empty label suppresses the bit entirely.
+    #
+    # error_overrides:
+    #   0: "Cell count mismatch"
 
 binary_sensor:
   - platform: jk_balancer

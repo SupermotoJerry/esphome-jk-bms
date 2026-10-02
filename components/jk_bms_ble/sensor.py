@@ -19,13 +19,14 @@ from esphome.const import (
     UNIT_AMPERE,
     UNIT_CELSIUS,
     UNIT_EMPTY,
+    UNIT_OHM,
     UNIT_PERCENT,
+    UNIT_SECOND,
     UNIT_VOLT,
     UNIT_WATT,
 )
 
-from . import CONF_JK_BMS_BLE_ID, JK_BMS_BLE_COMPONENT_SCHEMA
-from .const import CONF_BALANCING
+from . import CONF_JK_BMS_BLE_ID, JK_BMS_BLE_COMPONENT_SCHEMA, deprecated_renames
 
 CODEOWNERS = ["@syssi", "@txubelaxu"]
 
@@ -44,32 +45,37 @@ CONF_TEMPERATURE_SENSOR_2 = "temperature_sensor_2"
 CONF_TEMPERATURE_SENSOR_3 = "temperature_sensor_3"
 CONF_TEMPERATURE_SENSOR_4 = "temperature_sensor_4"
 CONF_TEMPERATURE_SENSOR_5 = "temperature_sensor_5"
-CONF_POWER_TUBE_TEMPERATURE = "power_tube_temperature"
+CONF_MOSFET_TEMPERATURE = "mosfet_temperature"
 CONF_STATE_OF_CHARGE = "state_of_charge"
 CONF_STATE_OF_HEALTH = "state_of_health"
 CONF_CAPACITY_REMAINING = "capacity_remaining"
-CONF_TOTAL_BATTERY_CAPACITY_SETTING = "total_battery_capacity_setting"
+CONF_FULL_CHARGE_CAPACITY = "full_charge_capacity"
 CONF_CHARGING_CYCLES = "charging_cycles"
 CONF_TOTAL_CHARGING_CYCLE_CAPACITY = "total_charging_cycle_capacity"
 CONF_TOTAL_RUNTIME = "total_runtime"
+CONF_POWER_ON_COUNT = "power_on_count"
 CONF_BALANCING_CURRENT = "balancing_current"
-CONF_ERRORS_BITMASK = "errors_bitmask"
 CONF_EMERGENCY_TIME_COUNTDOWN = "emergency_time_countdown"
+CONF_SMART_SLEEP_COUNTDOWN = "smart_sleep_countdown"
 CONF_HEATING_CURRENT = "heating_current"
 CONF_CHARGE_STATUS_ID = "charge_status_id"
 CONF_CHARGE_STATUS_TIME_ELAPSED = "charge_status_time_elapsed"
+CONF_DETAIL_LOG_ENTRY_COUNT = "detail_log_entry_count"
+CONF_BATTERY_TYPE_ID = "battery_type_id"
+CONF_BALANCER_STATUS_BITMASK = "balancer_status_bitmask"
+CONF_UART1_PROTOCOLS_ENABLED_BITMASK = "uart1_protocols_enabled_bitmask"
+CONF_UART2_PROTOCOLS_ENABLED_BITMASK = "uart2_protocols_enabled_bitmask"
+CONF_UART3_PROTOCOLS_ENABLED_BITMASK = "uart3_protocols_enabled_bitmask"
+CONF_CAN_PROTOCOLS_ENABLED_BITMASK = "can_protocols_enabled_bitmask"
 
 UNIT_AMPERE_HOURS = "Ah"
-UNIT_OHM = "Ω"
-UNIT_SECONDS = "s"
-
 ICON_CURRENT_DC = "mdi:current-dc"
 ICON_CAPACITY = "mdi:battery-medium"
 ICON_MIN_VOLTAGE_CELL = "mdi:battery-minus-outline"
 ICON_MAX_VOLTAGE_CELL = "mdi:battery-plus-outline"
 ICON_CAPACITY_REMAINING = "mdi:battery-50"
 ICON_CHARGING_CYCLES = "mdi:battery-sync"
-ICON_ERRORS_BITMASK = "mdi:alert-circle-outline"
+ICON_POWER_ON_COUNT = "mdi:power-cycle"
 ICON_CELL_RESISTANCE = "mdi:omega"
 ICON_BALANCER = "mdi:seesaw"
 ICON_CHARGE_STATUS_ID = "mdi:battery-clock"
@@ -104,7 +110,7 @@ _TEMPERATURE_SCHEMA = sensor.sensor_schema(
 )
 
 SENSOR_DEFS = {
-    CONF_BALANCING: {
+    CONF_BALANCER_STATUS_BITMASK: {
         "unit_of_measurement": UNIT_EMPTY,
         "icon": ICON_BALANCER,
         "accuracy_decimals": 0,
@@ -188,7 +194,7 @@ SENSOR_DEFS = {
         "device_class": DEVICE_CLASS_POWER,
         "state_class": STATE_CLASS_MEASUREMENT,
     },
-    CONF_POWER_TUBE_TEMPERATURE: {
+    CONF_MOSFET_TEMPERATURE: {
         "unit_of_measurement": UNIT_CELSIUS,
         "icon": ICON_EMPTY,
         "accuracy_decimals": 1,
@@ -214,7 +220,7 @@ SENSOR_DEFS = {
         "device_class": DEVICE_CLASS_EMPTY,
         "state_class": STATE_CLASS_MEASUREMENT,
     },
-    CONF_TOTAL_BATTERY_CAPACITY_SETTING: {
+    CONF_FULL_CHARGE_CAPACITY: {
         "unit_of_measurement": UNIT_AMPERE_HOURS,
         "icon": ICON_EMPTY,
         "accuracy_decimals": 0,
@@ -236,11 +242,19 @@ SENSOR_DEFS = {
         "state_class": STATE_CLASS_TOTAL_INCREASING,
     },
     CONF_TOTAL_RUNTIME: {
-        "unit_of_measurement": UNIT_SECONDS,
+        "unit_of_measurement": UNIT_SECOND,
         "icon": ICON_TIMELAPSE,
         "accuracy_decimals": 0,
         "device_class": DEVICE_CLASS_EMPTY,
         "state_class": STATE_CLASS_TOTAL_INCREASING,
+    },
+    CONF_POWER_ON_COUNT: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_POWER_ON_COUNT,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "state_class": STATE_CLASS_TOTAL_INCREASING,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
     },
     CONF_BALANCING_CURRENT: {
         "unit_of_measurement": UNIT_AMPERE,
@@ -249,15 +263,14 @@ SENSOR_DEFS = {
         "device_class": DEVICE_CLASS_CURRENT,
         "state_class": STATE_CLASS_MEASUREMENT,
     },
-    CONF_ERRORS_BITMASK: {
-        "unit_of_measurement": UNIT_EMPTY,
-        "icon": ICON_ERRORS_BITMASK,
+    CONF_EMERGENCY_TIME_COUNTDOWN: {
+        "unit_of_measurement": UNIT_SECOND,
+        "icon": ICON_TIMELAPSE,
         "accuracy_decimals": 0,
         "device_class": DEVICE_CLASS_EMPTY,
-        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
     },
-    CONF_EMERGENCY_TIME_COUNTDOWN: {
-        "unit_of_measurement": UNIT_SECONDS,
+    CONF_SMART_SLEEP_COUNTDOWN: {
+        "unit_of_measurement": UNIT_SECOND,
         "icon": ICON_TIMELAPSE,
         "accuracy_decimals": 0,
         "device_class": DEVICE_CLASS_EMPTY,
@@ -276,14 +289,67 @@ SENSOR_DEFS = {
         "device_class": DEVICE_CLASS_EMPTY,
     },
     CONF_CHARGE_STATUS_TIME_ELAPSED: {
-        "unit_of_measurement": UNIT_SECONDS,
+        "unit_of_measurement": UNIT_SECOND,
         "icon": ICON_CHARGE_STATUS_TIME_ELAPSED,
         "accuracy_decimals": 0,
         "device_class": DEVICE_CLASS_EMPTY,
     },
+    CONF_DETAIL_LOG_ENTRY_COUNT: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_COUNTER,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+    },
+    CONF_BATTERY_TYPE_ID: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+    },
+    CONF_UART1_PROTOCOLS_ENABLED_BITMASK: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+    },
+    CONF_UART2_PROTOCOLS_ENABLED_BITMASK: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+    },
+    CONF_UART3_PROTOCOLS_ENABLED_BITMASK: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+    },
+    CONF_CAN_PROTOCOLS_ENABLED_BITMASK: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "entity_category": ENTITY_CATEGORY_DIAGNOSTIC,
+    },
 }
 
-CONFIG_SCHEMA = (
+_RENAMED_SENSORS = {
+    "balancing": "balancer_status_bitmask",
+    "total_battery_capacity_setting": "full_charge_capacity",
+    "power_tube_temperature": "mosfet_temperature",
+    "power_tube_overtemperature_protection": "mosfet_overtemperature_protection",
+    "power_tube_overtemperature_protection_recovery": "mosfet_overtemperature_protection_recovery",
+    "detail_log_count": "detail_log_entry_count",
+    "balancer_status": "balancer_status_bitmask",
+}
+
+CONFIG_SCHEMA = cv.All(
+    deprecated_renames(_RENAMED_SENSORS),
     JK_BMS_BLE_COMPONENT_SCHEMA.extend(
         {
             cv.Optional(key): sensor.sensor_schema(**kwargs)
@@ -293,6 +359,13 @@ CONFIG_SCHEMA = (
     .extend({cv.Optional(key): _CELL_VOLTAGE_SCHEMA for key in CELL_VOLTAGES})
     .extend({cv.Optional(key): _CELL_RESISTANCE_SCHEMA for key in CELL_RESISTANCES})
     .extend({cv.Optional(key): _TEMPERATURE_SCHEMA for key in TEMPERATURES})
+    .extend(
+        {
+            cv.Optional("errors_bitmask"): cv.invalid(
+                "sensor.errors_bitmask has been removed; use text_sensor.errors_bitmask_hex instead"
+            ),
+        }
+    ),
 )
 
 

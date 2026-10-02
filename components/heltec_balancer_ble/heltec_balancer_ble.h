@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
 #include "esphome/components/ble_client/ble_client.h"
@@ -20,6 +21,13 @@ namespace esphome::heltec_balancer_ble {
 #ifdef USE_ESP32
 namespace espbt = esphome::esp32_ble_tracker;
 #endif
+
+enum ProtocolVersion {
+  PROTOCOL_VERSION_V1,
+  PROTOCOL_VERSION_V2,
+};
+
+enum class InitState { NEED_DEVICE_INFO, NEED_SETTINGS, NEED_CELL_INFO, READY };
 
 class HeltecBalancerBle :
 #ifdef USE_ESP32
@@ -54,6 +62,89 @@ class HeltecBalancerBle :
   void set_nominal_battery_capacity_number(number::Number *nominal_battery_capacity_number) {
     nominal_battery_capacity_number_ = nominal_battery_capacity_number;
   }
+  void set_cell_overvoltage_protection_number(number::Number *cell_overvoltage_protection_number) {
+    cell_overvoltage_protection_number_ = cell_overvoltage_protection_number;
+  }
+  void set_cell_overvoltage_recovery_number(number::Number *cell_overvoltage_recovery_number) {
+    cell_overvoltage_recovery_number_ = cell_overvoltage_recovery_number;
+  }
+  void set_cell_undervoltage_protection_number(number::Number *cell_undervoltage_protection_number) {
+    cell_undervoltage_protection_number_ = cell_undervoltage_protection_number;
+  }
+  void set_cell_undervoltage_recovery_number(number::Number *cell_undervoltage_recovery_number) {
+    cell_undervoltage_recovery_number_ = cell_undervoltage_recovery_number;
+  }
+  void set_cell_voltage_difference_protection_number(number::Number *cell_voltage_difference_protection_number) {
+    cell_voltage_difference_protection_number_ = cell_voltage_difference_protection_number;
+  }
+  void set_cell_voltage_difference_recovery_number(number::Number *cell_voltage_difference_recovery_number) {
+    cell_voltage_difference_recovery_number_ = cell_voltage_difference_recovery_number;
+  }
+  void set_cell_shutdown_voltage_number(number::Number *cell_shutdown_voltage_number) {
+    cell_shutdown_voltage_number_ = cell_shutdown_voltage_number;
+  }
+  void set_charging_overcurrent_protection_number(number::Number *charging_overcurrent_protection_number) {
+    charging_overcurrent_protection_number_ = charging_overcurrent_protection_number;
+  }
+  void set_charging_overcurrent_delay_number(number::Number *charging_overcurrent_delay_number) {
+    charging_overcurrent_delay_number_ = charging_overcurrent_delay_number;
+  }
+  void set_charging_overcurrent_recovery_number(number::Number *charging_overcurrent_recovery_number) {
+    charging_overcurrent_recovery_number_ = charging_overcurrent_recovery_number;
+  }
+  void set_discharging_overcurrent_protection_number(number::Number *discharging_overcurrent_protection_number) {
+    discharging_overcurrent_protection_number_ = discharging_overcurrent_protection_number;
+  }
+  void set_discharging_overcurrent_delay_number(number::Number *discharging_overcurrent_delay_number) {
+    discharging_overcurrent_delay_number_ = discharging_overcurrent_delay_number;
+  }
+  void set_discharging_overcurrent_recovery_number(number::Number *discharging_overcurrent_recovery_number) {
+    discharging_overcurrent_recovery_number_ = discharging_overcurrent_recovery_number;
+  }
+  void set_discharging_overcurrent_2_protection_number(number::Number *discharging_overcurrent_2_protection_number) {
+    discharging_overcurrent_2_protection_number_ = discharging_overcurrent_2_protection_number;
+  }
+  void set_discharging_overcurrent_2_delay_number(number::Number *discharging_overcurrent_2_delay_number) {
+    discharging_overcurrent_2_delay_number_ = discharging_overcurrent_2_delay_number;
+  }
+  void set_discharging_overcurrent_2_recovery_number(number::Number *discharging_overcurrent_2_recovery_number) {
+    discharging_overcurrent_2_recovery_number_ = discharging_overcurrent_2_recovery_number;
+  }
+  void set_short_circuit_protection_number(number::Number *short_circuit_protection_number) {
+    short_circuit_protection_number_ = short_circuit_protection_number;
+  }
+  void set_short_circuit_detection_delay_number(number::Number *short_circuit_detection_delay_number) {
+    short_circuit_detection_delay_number_ = short_circuit_detection_delay_number;
+  }
+  void set_short_circuit_recovery_number(number::Number *short_circuit_recovery_number) {
+    short_circuit_recovery_number_ = short_circuit_recovery_number;
+  }
+  void set_charging_overtemperature_protection_number(number::Number *charging_overtemperature_protection_number) {
+    charging_overtemperature_protection_number_ = charging_overtemperature_protection_number;
+  }
+  void set_charging_overtemperature_recovery_number(number::Number *charging_overtemperature_recovery_number) {
+    charging_overtemperature_recovery_number_ = charging_overtemperature_recovery_number;
+  }
+  void set_charging_undertemperature_protection_number(number::Number *charging_undertemperature_protection_number) {
+    charging_undertemperature_protection_number_ = charging_undertemperature_protection_number;
+  }
+  void set_charging_undertemperature_recovery_number(number::Number *charging_undertemperature_recovery_number) {
+    charging_undertemperature_recovery_number_ = charging_undertemperature_recovery_number;
+  }
+  void set_discharging_overtemperature_protection_number(
+      number::Number *discharging_overtemperature_protection_number) {
+    discharging_overtemperature_protection_number_ = discharging_overtemperature_protection_number;
+  }
+  void set_discharging_overtemperature_recovery_number(number::Number *discharging_overtemperature_recovery_number) {
+    discharging_overtemperature_recovery_number_ = discharging_overtemperature_recovery_number;
+  }
+  void set_discharging_undertemperature_protection_number(
+      number::Number *discharging_undertemperature_protection_number) {
+    discharging_undertemperature_protection_number_ = discharging_undertemperature_protection_number;
+  }
+  void set_discharging_undertemperature_recovery_number(number::Number *discharging_undertemperature_recovery_number) {
+    discharging_undertemperature_recovery_number_ = discharging_undertemperature_recovery_number;
+  }
 
   void set_balancing_binary_sensor(binary_sensor::BinarySensor *balancing_binary_sensor) {
     balancing_binary_sensor_ = balancing_binary_sensor;
@@ -71,6 +162,8 @@ class HeltecBalancerBle :
     online_status_binary_sensor_ = online_status_binary_sensor;
   }
 
+  void set_protocol_version(ProtocolVersion protocol_version) { protocol_version_ = protocol_version; }
+  ProtocolVersion get_protocol_version() { return protocol_version_; }
   void set_throttle(uint32_t throttle) { this->throttle_ = throttle; }
   void set_min_cell_voltage_sensor(sensor::Sensor *min_cell_voltage_sensor) {
     min_cell_voltage_sensor_ = min_cell_voltage_sensor;
@@ -103,7 +196,25 @@ class HeltecBalancerBle :
   void set_temperature_sensor_2_sensor(sensor::Sensor *temperature_sensor_2_sensor) {
     temperature_sensor_2_sensor_ = temperature_sensor_2_sensor;
   }
+  void set_mosfet_temperature_sensor(sensor::Sensor *mosfet_temperature_sensor) {
+    mosfet_temperature_sensor_ = mosfet_temperature_sensor;
+  }
+  void set_balancer_temperature_sensor(sensor::Sensor *balancer_temperature_sensor) {
+    balancer_temperature_sensor_ = balancer_temperature_sensor;
+  }
+  void set_nominal_capacity_sensor(sensor::Sensor *nominal_capacity_sensor) {
+    nominal_capacity_sensor_ = nominal_capacity_sensor;
+  }
+  void set_capacity_remaining_sensor(sensor::Sensor *capacity_remaining_sensor) {
+    capacity_remaining_sensor_ = capacity_remaining_sensor;
+  }
+  void set_state_of_charge_sensor(sensor::Sensor *state_of_charge_sensor) {
+    state_of_charge_sensor_ = state_of_charge_sensor;
+  }
   void set_total_runtime_sensor(sensor::Sensor *total_runtime_sensor) { total_runtime_sensor_ = total_runtime_sensor; }
+  void set_power_on_count_sensor(sensor::Sensor *power_on_count_sensor) {
+    power_on_count_sensor_ = power_on_count_sensor;
+  }
   void set_balancing_current_sensor(sensor::Sensor *balancing_current_sensor) {
     balancing_current_sensor_ = balancing_current_sensor;
   }
@@ -140,6 +251,21 @@ class HeltecBalancerBle :
   void set_battery_type_text_sensor(text_sensor::TextSensor *battery_type_text_sensor) {
     battery_type_text_sensor_ = battery_type_text_sensor;
   }
+  void set_device_model_text_sensor(text_sensor::TextSensor *device_model_text_sensor) {
+    device_model_text_sensor_ = device_model_text_sensor;
+  }
+  void set_hardware_version_text_sensor(text_sensor::TextSensor *hardware_version_text_sensor) {
+    hardware_version_text_sensor_ = hardware_version_text_sensor;
+  }
+  void set_software_version_text_sensor(text_sensor::TextSensor *software_version_text_sensor) {
+    software_version_text_sensor_ = software_version_text_sensor;
+  }
+  void set_protocol_version_text_sensor(text_sensor::TextSensor *protocol_version_text_sensor) {
+    protocol_version_text_sensor_ = protocol_version_text_sensor;
+  }
+  void set_manufacturing_date_text_sensor(text_sensor::TextSensor *manufacturing_date_text_sensor) {
+    manufacturing_date_text_sensor_ = manufacturing_date_text_sensor;
+  }
 
   void set_buzzer_mode_select(select::Select *buzzer_mode_select) { buzzer_mode_select_ = buzzer_mode_select; }
   void set_battery_type_select(select::Select *battery_type_select) { battery_type_select_ = battery_type_select; }
@@ -168,6 +294,33 @@ class HeltecBalancerBle :
   number::Number *balance_start_voltage_number_{nullptr};
   number::Number *balance_stop_diff_voltage_number_{nullptr};
   number::Number *nominal_battery_capacity_number_{nullptr};
+  number::Number *cell_overvoltage_protection_number_{nullptr};
+  number::Number *cell_overvoltage_recovery_number_{nullptr};
+  number::Number *cell_undervoltage_protection_number_{nullptr};
+  number::Number *cell_undervoltage_recovery_number_{nullptr};
+  number::Number *cell_voltage_difference_protection_number_{nullptr};
+  number::Number *cell_voltage_difference_recovery_number_{nullptr};
+  number::Number *cell_shutdown_voltage_number_{nullptr};
+  number::Number *charging_overcurrent_protection_number_{nullptr};
+  number::Number *charging_overcurrent_delay_number_{nullptr};
+  number::Number *charging_overcurrent_recovery_number_{nullptr};
+  number::Number *discharging_overcurrent_protection_number_{nullptr};
+  number::Number *discharging_overcurrent_delay_number_{nullptr};
+  number::Number *discharging_overcurrent_recovery_number_{nullptr};
+  number::Number *discharging_overcurrent_2_protection_number_{nullptr};
+  number::Number *discharging_overcurrent_2_delay_number_{nullptr};
+  number::Number *discharging_overcurrent_2_recovery_number_{nullptr};
+  number::Number *short_circuit_protection_number_{nullptr};
+  number::Number *short_circuit_detection_delay_number_{nullptr};
+  number::Number *short_circuit_recovery_number_{nullptr};
+  number::Number *charging_overtemperature_protection_number_{nullptr};
+  number::Number *charging_overtemperature_recovery_number_{nullptr};
+  number::Number *charging_undertemperature_protection_number_{nullptr};
+  number::Number *charging_undertemperature_recovery_number_{nullptr};
+  number::Number *discharging_overtemperature_protection_number_{nullptr};
+  number::Number *discharging_overtemperature_recovery_number_{nullptr};
+  number::Number *discharging_undertemperature_protection_number_{nullptr};
+  number::Number *discharging_undertemperature_recovery_number_{nullptr};
 
   sensor::Sensor *min_cell_voltage_sensor_{nullptr};
   sensor::Sensor *max_cell_voltage_sensor_{nullptr};
@@ -178,7 +331,13 @@ class HeltecBalancerBle :
   sensor::Sensor *total_voltage_sensor_{nullptr};
   sensor::Sensor *temperature_sensor_1_sensor_{nullptr};
   sensor::Sensor *temperature_sensor_2_sensor_{nullptr};
+  sensor::Sensor *mosfet_temperature_sensor_{nullptr};
+  sensor::Sensor *balancer_temperature_sensor_{nullptr};
+  sensor::Sensor *nominal_capacity_sensor_{nullptr};
+  sensor::Sensor *capacity_remaining_sensor_{nullptr};
+  sensor::Sensor *state_of_charge_sensor_{nullptr};
   sensor::Sensor *total_runtime_sensor_{nullptr};
+  sensor::Sensor *power_on_count_sensor_{nullptr};
   sensor::Sensor *balancing_current_sensor_{nullptr};
   sensor::Sensor *errors_bitmask_sensor_{nullptr};
   sensor::Sensor *cell_detection_failed_bitmask_sensor_{nullptr};
@@ -196,18 +355,30 @@ class HeltecBalancerBle :
   text_sensor::TextSensor *total_runtime_formatted_text_sensor_{nullptr};
   text_sensor::TextSensor *buzzer_mode_text_sensor_{nullptr};
   text_sensor::TextSensor *battery_type_text_sensor_{nullptr};
+  text_sensor::TextSensor *device_model_text_sensor_{nullptr};
+  text_sensor::TextSensor *hardware_version_text_sensor_{nullptr};
+  text_sensor::TextSensor *software_version_text_sensor_{nullptr};
+  text_sensor::TextSensor *protocol_version_text_sensor_{nullptr};
+  text_sensor::TextSensor *manufacturing_date_text_sensor_{nullptr};
 
   std::vector<uint8_t> frame_buffer_;
-  bool status_notification_received_ = false;
+  InitState init_state_{InitState::NEED_DEVICE_INFO};
+  ProtocolVersion protocol_version_{PROTOCOL_VERSION_V1};
   uint8_t no_response_count_{0};
   uint16_t char_handle_{0};
+  uint32_t connection_time_{0};
   uint32_t last_cell_info_{0};
   uint32_t throttle_;
 
+  std::array<uint8_t, 20> build_command_frame_(uint8_t function, uint8_t command, uint8_t register_address,
+                                               uint32_t value);
   void decode_(const std::vector<uint8_t> &data);
   void decode_device_info_(const std::vector<uint8_t> &data);
+  void decode_cell_arrays_(const std::vector<uint8_t> &data);
   void decode_cell_info_(const std::vector<uint8_t> &data);
+  void decode_cell_info_v2_(const std::vector<uint8_t> &data);
   void decode_settings_(const std::vector<uint8_t> &data);
+  void decode_settings_v2_(const std::vector<uint8_t> &data);
   void decode_factory_defaults_(const std::vector<uint8_t> &data);
   void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
   void publish_state_(number::Number *number, float value);

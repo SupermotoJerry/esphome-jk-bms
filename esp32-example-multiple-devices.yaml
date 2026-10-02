@@ -15,7 +15,7 @@ esphome:
   comment: ${device_description}
   project:
     name: "syssi.esphome-jk-bms"
-    version: 2.4.0
+    version: 3.0.0
   devices:
     - id: device0
       name: "${bms0}"
@@ -34,6 +34,7 @@ external_components:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  min_auth_mode: WPA2
 
 ota:
   platform: esphome
@@ -73,6 +74,11 @@ jk_bms:
   - id: bms0
     jk_modbus_id: modbus0
     update_interval: 5s
+    # Override the label of one or more error bits (bit 0-15).
+    # An empty label suppresses the bit entirely.
+    #
+    # error_overrides:
+    #   0: "Low SoC"
   - id: bms1
     jk_modbus_id: modbus1
     update_interval: 5s
@@ -119,8 +125,8 @@ sensor:
     average_cell_voltage:
       name: "average cell voltage"
       device_id: device0
-    power_tube_temperature:
-      name: "power tube temperature"
+    mosfet_temperature:
+      name: "mosfet temperature"
       device_id: device0
     total_voltage:
       name: "total voltage"
@@ -141,8 +147,8 @@ sensor:
     average_cell_voltage:
       name: "average cell voltage"
       device_id: device1
-    power_tube_temperature:
-      name: "power tube temperature"
+    mosfet_temperature:
+      name: "mosfet temperature"
       device_id: device1
     total_voltage:
       name: "total voltage"

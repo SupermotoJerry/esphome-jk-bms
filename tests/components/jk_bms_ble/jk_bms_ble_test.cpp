@@ -25,6 +25,46 @@ TEST(JkBmsBleDeviceInfoTest, SoftwareVersion) {
   EXPECT_EQ(sw.state, "10.07");
 }
 
+TEST(JkBmsBleDeviceInfoTest, DeviceModel) {
+  TestableJkBmsBle bms;
+  text_sensor::TextSensor device_model;
+  bms.set_device_model_text_sensor(&device_model);
+
+  bms.decode_device_info_(DEVICE_INFO_JK02_24S_V10);
+
+  EXPECT_EQ(device_model.state, "JK-B2A24S20P");
+}
+
+TEST(JkBmsBleDeviceInfoTest, ManufacturingDate) {
+  TestableJkBmsBle bms;
+  text_sensor::TextSensor manufacturing_date;
+  bms.set_manufacturing_date_text_sensor(&manufacturing_date);
+
+  bms.decode_device_info_(DEVICE_INFO_JK02_24S_V10);
+
+  EXPECT_EQ(manufacturing_date.state, "20220511");
+}
+
+TEST(JkBmsBleDeviceInfoTest, SerialNumber) {
+  TestableJkBmsBle bms;
+  text_sensor::TextSensor serial_number;
+  bms.set_serial_number_text_sensor(&serial_number);
+
+  bms.decode_device_info_(DEVICE_INFO_JK02_24S_V10);
+
+  EXPECT_EQ(serial_number.state, "2041803028");
+}
+
+TEST(JkBmsBleDeviceInfoTest, PowerOnCount) {
+  TestableJkBmsBle bms;
+  sensor::Sensor power_on_count;
+  bms.set_power_on_count_sensor(&power_on_count);
+
+  bms.decode_device_info_(DEVICE_INFO_JK02_24S_V10);
+
+  EXPECT_EQ(power_on_count.state, 1.0f);
+}
+
 TEST(JkBmsBleDeviceInfoTest, NullSensorsDoNotCrash) {
   TestableJkBmsBle bms;
   bms.decode_device_info_(DEVICE_INFO_JK02_24S_V10);
@@ -128,7 +168,7 @@ TEST(JkBmsBleJk02CellInfoTest, Temperatures) {
   sensor::Sensor t1, t2, tube;
   bms.set_temperature_sensor(0, &t1);
   bms.set_temperature_sensor(1, &t2);
-  bms.set_power_tube_temperature_sensor(&tube);
+  bms.set_mosfet_temperature_sensor(&tube);
 
   bms.decode_jk02_cell_info_(CELL_INFO_JK02_24S_V10);
 
@@ -139,27 +179,27 @@ TEST(JkBmsBleJk02CellInfoTest, Temperatures) {
 
 TEST(JkBmsBleJk02CellInfoTest, NoErrors) {
   TestableJkBmsBle bms;
-  sensor::Sensor errors_bitmask;
+  text_sensor::TextSensor errors_bitmask_hex;
   text_sensor::TextSensor errors_text;
-  bms.set_errors_bitmask_sensor(&errors_bitmask);
+  bms.set_errors_bitmask_hex_text_sensor(&errors_bitmask_hex);
   bms.set_errors_text_sensor(&errors_text);
 
   bms.decode_jk02_cell_info_(CELL_INFO_JK02_24S_V10);
 
-  EXPECT_FLOAT_EQ(errors_bitmask.state, 0.0f);
+  EXPECT_EQ(errors_bitmask_hex.state, "0x00000000");
   EXPECT_EQ(errors_text.state, "");
 }
 
 TEST(JkBmsBleJk02CellInfoTest, BalancingOff) {
   TestableJkBmsBle bms;
-  sensor::Sensor balancing;
+  sensor::Sensor balancer_status_bitmask;
   binary_sensor::BinarySensor balancing_binary;
-  bms.set_balancing_sensor(&balancing);
+  bms.set_balancer_status_bitmask_sensor(&balancer_status_bitmask);
   bms.set_balancing_binary_sensor(&balancing_binary);
 
   bms.decode_jk02_cell_info_(CELL_INFO_JK02_24S_V10);
 
-  EXPECT_FLOAT_EQ(balancing.state, 0.0f);
+  EXPECT_FLOAT_EQ(balancer_status_bitmask.state, 0.0f);
   EXPECT_FALSE(balancing_binary.state);
 }
 
@@ -187,7 +227,7 @@ TEST(JkBmsBleJk02CellInfoTest, Capacity) {
   TestableJkBmsBle bms;
   sensor::Sensor remaining, nominal, cycles;
   bms.set_capacity_remaining_sensor(&remaining);
-  bms.set_total_battery_capacity_setting_sensor(&nominal);
+  bms.set_full_charge_capacity_sensor(&nominal);
   bms.set_charging_cycles_sensor(&cycles);
 
   bms.decode_jk02_cell_info_(CELL_INFO_JK02_24S_V10);

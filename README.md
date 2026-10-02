@@ -28,6 +28,7 @@ All JK-BMS models with software version `>=6.0` are using the implemented protoc
 * JK-BD4A17S4P, hw 11.xw, sw 11.01 (reported by [@Condor-XYZ](https://github.com/syssi/esphome-jk-bms/issues/221))
 * JK-BD4A17S4P, hw 11.xw, sw 11.27, using `JK02_32S` and/or UART-TTL (reported by [@hemskgren](https://github.com/syssi/esphome-jk-bms/issues/359))
 * JK-B1A8S10P, hw 11.XW, sw 11.261, using `JK02_32S` (reported by [@Chickenbreast0](https://github.com/syssi/esphome-jk-bms/issues/346))
+* JK-B1A8S20P, hw 19.h, sw 19.31, using `JK02_32S` (reported by [@aurelius1688](https://github.com/syssi/esphome-jk-bms/issues/956))
 * JK-B1A16S15P, hw 11.5, sw 11.261, using `JK02_32S` (reported by [@delboy711](https://github.com/syssi/esphome-jk-bms/discussions/368))
 * JK-B1A24S15P, hw 8.x, sw 8.1.0H (reported by [@killee](https://github.com/syssi/esphome-jk-bms/discussions/4))
 * JK-B1A20S15P, hw 8.x, sw 8.14U (reported by  [@trippfam07](https://github.com/syssi/esphome-jk-bms/issues/31))
@@ -127,6 +128,14 @@ wifi_password: MY_WIFI_PASSWORD
 mqtt_host: MY_MQTT_HOST
 mqtt_username: MY_MQTT_USERNAME
 mqtt_password: MY_MQTT_PASSWORD
+
+# BMS MAC address(es) — replace with the actual Bluetooth address of your device(s)
+bms0_mac_address: C8:47:8C:E1:E2:AA
+bms1_mac_address: C8:47:8C:E1:E2:BB
+
+# Heltec/NEEY balancer MAC address(es) — only needed for balancer example configurations
+balancer0_mac_address: C8:47:8C:E1:E2:AA
+balancer1_mac_address: C8:47:8C:E1:E2:BB
 EOF
 
 # Validate the configuration, create a binary, upload it, and start logs
@@ -151,7 +160,7 @@ esphome run esp32-example.yaml
 [sensor:127]: 'jk-bms cell voltage 11': Sending state 4.12800 V with 3 decimals of accuracy
 [sensor:127]: 'jk-bms cell voltage 12': Sending state 4.13100 V with 3 decimals of accuracy
 [sensor:127]: 'jk-bms cell voltage 13': Sending state 4.12400 V with 3 decimals of accuracy
-[sensor:127]: 'jk-bms power tube temperature': Sending state 24.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms mosfet temperature': Sending state 24.00000 °C with 0 decimals of accuracy
 [sensor:127]: 'jk-bms temperature sensor 1': Sending state 22.00000 °C with 0 decimals of accuracy
 [sensor:127]: 'jk-bms temperature sensor 2': Sending state 22.00000 °C with 0 decimals of accuracy
 [sensor:127]: 'jk-bms total voltage': Sending state 53.64000 V with 2 decimals of accuracy
@@ -178,20 +187,20 @@ esphome run esp32-example.yaml
 [sensor:127]: 'jk-bms discharging overcurrent delay': Sending state 300.00000 s with 0 decimals of accuracy
 [sensor:127]: 'jk-bms charging overcurrent protection': Sending state 25.00000 A with 0 decimals of accuracy
 [sensor:127]: 'jk-bms charging overcurrent delay': Sending state 30.00000 s with 0 decimals of accuracy
-[sensor:127]: 'jk-bms balance starting voltage': Sending state 3.30000 V with 3 decimals of accuracy
+[sensor:127]: 'jk-bms balancing start voltage': Sending state 3.30000 V with 3 decimals of accuracy
 [sensor:127]: 'jk-bms balance opening pressure difference': Sending state 0.01000 V with 3 decimals of accuracy
 [switch:045]: 'jk-bms balancing': Sending state ON
-[sensor:127]: 'jk-bms power tube temperature protection': Sending state 90.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms power tube temperature recovery': Sending state 70.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms temperature sensor temperature protection': Sending state 100.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms temperature sensor temperature recovery': Sending state 100.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms temperature sensor temperature difference protection': Sending state 20.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms charging high temperature protection': Sending state 70.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms discharging high temperature protection': Sending state 70.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms charging low temperature protection': Sending state -20.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms charging low temperature recovery': Sending state -10.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms discharging low temperature protection': Sending state -20.00000 °C with 0 decimals of accuracy
-[sensor:127]: 'jk-bms discharging low temperature recovery': Sending state -10.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms mosfet overtemperature protection': Sending state 90.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms mosfet overtemperature recovery': Sending state 70.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms battery overtemperature protection': Sending state 100.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms battery overtemperature recovery': Sending state 100.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms battery temperature difference protection': Sending state 20.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms charging overtemperature protection': Sending state 70.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms discharging overtemperature protection': Sending state 70.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms charging undertemperature protection': Sending state -20.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms charging undertemperature recovery': Sending state -10.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms discharging undertemperature protection': Sending state -20.00000 °C with 0 decimals of accuracy
+[sensor:127]: 'jk-bms discharging undertemperature recovery': Sending state -10.00000 °C with 0 decimals of accuracy
 [switch:045]: 'jk-bms charging': Sending state OFF
 [switch:045]: 'jk-bms discharging': Sending state OFF
 [sensor:127]: 'jk-bms current calibration': Sending state 0.72500 A with 3 decimals of accuracy

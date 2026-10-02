@@ -4,8 +4,6 @@ substitutions:
   bms1: "${name} bms1"
   device_description: "Monitor and control a JK-BMS via bluetooth"
   external_components_source: github://syssi/esphome-jk-bms@main
-  bms0_mac_address: C8:47:8C:E1:E2:AA
-  bms1_mac_address: C8:47:8C:E1:E2:BB
   # Please use "JK02_24S" if you own a old JK-BMS < hardware version 11.0 (hardware version >= 6.0 and < 11.0)
   # Please use "JK02_32S" if you own a new JK-BMS >= hardware version 11.0 (f.e. JK-B2A8S20P hw 11.XW, sw 11.26)
   # Please use "JK04" if you have some old JK-BMS <= hardware version 3.0 (f.e. JK-B2A16S hw 3.0, sw. 3.3.0)
@@ -18,7 +16,7 @@ esphome:
   comment: ${device_description}
   project:
     name: "syssi.esphome-jk-bms"
-    version: 2.4.0
+    version: 3.0.0
   devices:
     - id: device0
       name: "${bms0}"
@@ -37,6 +35,7 @@ external_components:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  min_auth_mode: WPA2
 
 ota:
   platform: esphome
@@ -66,9 +65,9 @@ esp32_ble_tracker:
     active: false
 
 ble_client:
-  - mac_address: ${bms0_mac_address}
+  - mac_address: !secret bms0_mac_address
     id: client0
-  - mac_address: ${bms1_mac_address}
+  - mac_address: !secret bms1_mac_address
     id: client1
 
 jk_bms_ble:
@@ -76,6 +75,11 @@ jk_bms_ble:
     protocol_version: ${bms0_protocol_version}
     throttle: 5s
     id: bms0
+    # Override the label of one or more error bits (bit 0-31, JK02 only).
+    # An empty label suppresses the bit entirely.
+    #
+    # error_overrides:
+    #   4: "Cell overvoltage"
   - ble_client_id: client1
     protocol_version: ${bms1_protocol_version}
     throttle: 5s
@@ -127,6 +131,18 @@ button:
     retrieve_device_info:
       name: "retrieve device info"
       device_id: device0
+    retrieve_logbook:
+      name: "retrieve logbook"
+      device_id: device0
+    shutdown:
+      name: "shutdown"
+      device_id: device0
+    restart:
+      name: "restart"
+      device_id: device0
+    factory_reset:
+      name: "factory reset"
+      device_id: device0
 
   - platform: jk_bms_ble
     jk_bms_ble_id: bms1
@@ -135,6 +151,18 @@ button:
       device_id: device1
     retrieve_device_info:
       name: "retrieve device info"
+      device_id: device1
+    retrieve_logbook:
+      name: "retrieve logbook"
+      device_id: device1
+    shutdown:
+      name: "shutdown"
+      device_id: device1
+    restart:
+      name: "restart"
+      device_id: device1
+    factory_reset:
+      name: "factory reset"
       device_id: device1
 
 number:
@@ -161,8 +189,8 @@ number:
     cell_voltage_undervoltage_recovery:
       name: "cell voltage undervoltage recovery"
       device_id: device0
-    balance_starting_voltage:
-      name: "balance starting voltage"
+    balancing_start_voltage:
+      name: "balancing start voltage"
       device_id: device0
     voltage_calibration:
       name: "voltage calibration"
@@ -184,6 +212,12 @@ number:
       device_id: device0
     smart_sleep_voltage:
       name: "smart sleep voltage"
+      device_id: device0
+    smart_sleep_delay:
+      name: "smart sleep delay"
+      device_id: device0
+    emergency_duration:
+      name: "emergency duration"
       device_id: device0
     cell_soc100_voltage:
       name: "cell soc100 voltage"
@@ -245,11 +279,11 @@ number:
     discharge_undertemperature_protection_recovery:
       name: "discharge undertemperature protection recovery"
       device_id: device0
-    power_tube_overtemperature_protection:
-      name: "power tube overtemperature protection"
+    mosfet_overtemperature_protection:
+      name: "mosfet overtemperature protection"
       device_id: device0
-    power_tube_overtemperature_protection_recovery:
-      name: "power tube overtemperature protection recovery"
+    mosfet_overtemperature_protection_recovery:
+      name: "mosfet overtemperature protection recovery"
       device_id: device0
     # ...
 
@@ -276,8 +310,8 @@ number:
     cell_voltage_undervoltage_recovery:
       name: "cell voltage undervoltage recovery"
       device_id: device1
-    balance_starting_voltage:
-      name: "balance starting voltage"
+    balancing_start_voltage:
+      name: "balancing start voltage"
       device_id: device1
     voltage_calibration:
       name: "voltage calibration"
@@ -299,6 +333,12 @@ number:
       device_id: device1
     smart_sleep_voltage:
       name: "smart sleep voltage"
+      device_id: device1
+    smart_sleep_delay:
+      name: "smart sleep delay"
+      device_id: device1
+    emergency_duration:
+      name: "emergency duration"
       device_id: device1
     cell_soc100_voltage:
       name: "cell soc100 voltage"
@@ -360,11 +400,11 @@ number:
     discharge_undertemperature_protection_recovery:
       name: "discharge undertemperature protection recovery"
       device_id: device1
-    power_tube_overtemperature_protection:
-      name: "power tube overtemperature protection"
+    mosfet_overtemperature_protection:
+      name: "mosfet overtemperature protection"
       device_id: device1
-    power_tube_overtemperature_protection_recovery:
-      name: "power tube overtemperature protection recovery"
+    mosfet_overtemperature_protection_recovery:
+      name: "mosfet overtemperature protection recovery"
       device_id: device1
     # ...
 
@@ -566,11 +606,11 @@ sensor:
     temperature_sensor_5:
       name: "temperature sensor 5"
       device_id: device0
-    power_tube_temperature:
-      name: "power tube temperature"
+    mosfet_temperature:
+      name: "mosfet temperature"
       device_id: device0
-    balancing:
-      name: "balancing"
+    balancer_status_bitmask:
+      name: "balancer status bitmask"
       device_id: device0
     state_of_charge:
       name: "state of charge"
@@ -578,8 +618,8 @@ sensor:
     capacity_remaining:
       name: "capacity remaining"
       device_id: device0
-    total_battery_capacity_setting:
-      name: "total battery capacity setting"
+    full_charge_capacity:
+      name: "full charge capacity"
       device_id: device0
     charging_cycles:
       name: "charging cycles"
@@ -590,14 +630,20 @@ sensor:
     total_runtime:
       name: "total runtime"
       device_id: device0
+    power_on_count:
+      name: "power on count"
+      device_id: device0
     balancing_current:
       name: "balancing current"
       device_id: device0
-    errors_bitmask:
-      name: "errors bitmask"
-      device_id: device0
     emergency_time_countdown:
       name: "emergency time countdown"
+      device_id: device0
+    smart_sleep_countdown:
+      name: "smart sleep countdown"
+      device_id: device0
+    detail_log_entry_count:
+      name: "detail log entry count"
       device_id: device0
     # ...
 
@@ -798,11 +844,11 @@ sensor:
     temperature_sensor_5:
       name: "temperature sensor 5"
       device_id: device1
-    power_tube_temperature:
-      name: "power tube temperature"
+    mosfet_temperature:
+      name: "mosfet temperature"
       device_id: device1
-    balancing:
-      name: "balancing"
+    balancer_status_bitmask:
+      name: "balancer status bitmask"
       device_id: device1
     state_of_charge:
       name: "state of charge"
@@ -810,8 +856,8 @@ sensor:
     capacity_remaining:
       name: "capacity remaining"
       device_id: device1
-    total_battery_capacity_setting:
-      name: "total battery capacity setting"
+    full_charge_capacity:
+      name: "full charge capacity"
       device_id: device1
     charging_cycles:
       name: "charging cycles"
@@ -822,14 +868,20 @@ sensor:
     total_runtime:
       name: "total runtime"
       device_id: device1
+    power_on_count:
+      name: "power on count"
+      device_id: device1
     balancing_current:
       name: "balancing current"
       device_id: device1
-    errors_bitmask:
-      name: "errors bitmask"
-      device_id: device1
     emergency_time_countdown:
       name: "emergency time countdown"
+      device_id: device1
+    smart_sleep_countdown:
+      name: "smart sleep countdown"
+      device_id: device1
+    detail_log_entry_count:
+      name: "detail log entry count"
       device_id: device1
     # ...
 
@@ -917,11 +969,35 @@ switch:
     id: ble_client_switch1
     device_id: device1
 
+select:
+  - platform: jk_bms_ble
+    jk_bms_ble_id: bms0
+    multiplexed_port_mode:
+      name: "multiplexed port mode"
+      device_id: device0
+    load_config_preset:
+      name: "load config preset"
+      device_id: device0
+  - platform: jk_bms_ble
+    jk_bms_ble_id: bms1
+    multiplexed_port_mode:
+      name: "multiplexed port mode"
+      device_id: device1
+    load_config_preset:
+      name: "load config preset"
+      device_id: device1
+
 text_sensor:
   - platform: jk_bms_ble
     jk_bms_ble_id: bms0
     errors:
       name: "errors"
+      device_id: device0
+    errors_bitmask_hex:
+      name: "errors bitmask hex"
+      device_id: device0
+    balancer_status:
+      name: "balancer status"
       device_id: device0
     total_runtime_formatted:
       name: "total runtime formatted"
@@ -931,6 +1007,15 @@ text_sensor:
       device_id: device0
     hardware_version:
       name: "hardware version"
+      device_id: device0
+    device_model:
+      name: "device model"
+      device_id: device0
+    manufacturing_date:
+      name: "manufacturing date"
+      device_id: device0
+    serial_number:
+      name: "serial number"
       device_id: device0
 
   - platform: jk_bms_ble
@@ -938,6 +1023,12 @@ text_sensor:
     errors:
       name: "errors"
       device_id: device1
+    errors_bitmask_hex:
+      name: "errors bitmask hex"
+      device_id: device1
+    balancer_status:
+      name: "balancer status"
+      device_id: device1
     total_runtime_formatted:
       name: "total runtime formatted"
       device_id: device1
@@ -946,4 +1037,13 @@ text_sensor:
       device_id: device1
     hardware_version:
       name: "hardware version"
+      device_id: device1
+    device_model:
+      name: "device model"
+      device_id: device1
+    manufacturing_date:
+      name: "manufacturing date"
+      device_id: device1
+    serial_number:
+      name: "serial number"
       device_id: device1

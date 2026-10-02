@@ -53,7 +53,7 @@ esphome:
   comment: ${device_description}
   project:
     name: "syssi.esphome-jk-bms"
-    version: 2.4.0
+    version: 3.0.0
 
 esp32:
   board: wemos_d1_mini32
@@ -63,6 +63,7 @@ esp32:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  min_auth_mode: WPA2
   # This can help if you experience wifi connection issues and see errors like
   # bssid=12:34:56:78:9A:CB[redacted] reason=‘Auth Expired’
   # output_power: "8.5dB"
@@ -913,8 +914,107 @@ sensor:
     filters:
       - multiply: 0.001
 
+  # 0x1200    0    UINT16*32    64   R    CellVol0..CellVol31    mV
+  - platform: modbus_controller
+    modbus_controller_id: bms0
+    name: "max cell voltage"
+    address: 0x1200
+    register_type: holding
+    register_count: 32
+    response_size: 64
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    lambda: |-
+      uint16_t max_voltage = 0;
+      for (int i = 0; i < 32; i++) {
+        uint16_t cell_voltage = (data[i*2] << 8) | data[i*2+1];
+        if (cell_voltage > max_voltage) max_voltage = cell_voltage;
+      }
+      return max_voltage * 0.001f;
+
+  - platform: modbus_controller
+    modbus_controller_id: bms0
+    name: "min cell voltage"
+    address: 0x1200
+    register_type: holding
+    register_count: 32
+    response_size: 64
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    lambda: |-
+      uint16_t min_voltage = 0xFFFF;
+      for (int i = 0; i < 32; i++) {
+        uint16_t cell_voltage = (data[i*2] << 8) | data[i*2+1];
+        if (cell_voltage > 500 && cell_voltage < min_voltage) min_voltage = cell_voltage;
+      }
+      return min_voltage * 0.001f;
+
+  # 0x1248   72    UINT8/UINT8 2  R    MaxVolCellNbr / MinVolCellNbr
+  - platform: modbus_controller
+    modbus_controller_id: bms0
+    name: "max voltage cell"
+    address: 0x1200
+    register_type: holding
+    register_count: 32
+    response_size: 64
+    unit_of_measurement: ""
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: |-
+      uint16_t max_voltage = 0;
+      uint8_t max_cell = 0;
+      for (int i = 0; i < 32; i++) {
+        uint16_t cell_voltage = (data[i*2] << 8) | data[i*2+1];
+        if (cell_voltage > max_voltage) {
+          max_voltage = cell_voltage;
+          max_cell = i + 1;
+        }
+      }
+      return (float) max_cell;
+
+  - platform: modbus_controller
+    modbus_controller_id: bms0
+    name: "min voltage cell"
+    address: 0x1200
+    register_type: holding
+    register_count: 32
+    response_size: 64
+    unit_of_measurement: ""
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: |-
+      uint16_t min_voltage = 0xFFFF;
+      uint8_t min_cell = 0;
+      for (int i = 0; i < 32; i++) {
+        uint16_t cell_voltage = (data[i*2] << 8) | data[i*2+1];
+        if (cell_voltage > 500 && cell_voltage < min_voltage) {
+          min_voltage = cell_voltage;
+          min_cell = i + 1;
+        }
+      }
+      return (float) min_cell;
+
   # 0x1240   64    UINT32    4    R    CellStatus    (each bit indicates a attached cell)
   # 0x1244   68    UINT16    2    R    CellVolAverage    mV
+  - platform: modbus_controller
+    modbus_controller_id: bms0
+    name: "average cell voltage"
+    address: 0x1244
+    register_type: holding
+    value_type: U_WORD
+    register_count: 2
+    response_size: 2
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.001
+
   # 0x1246   70    UINT16    2    R    CellVoltageDifferenceMax    mV
   - platform: modbus_controller
     modbus_controller_id: bms0
@@ -930,37 +1030,6 @@ sensor:
     accuracy_decimals: 3
     filters:
       - multiply: 0.001
-
-  # 0x1248   72    UINT8/UINT8 2  R    MaxVolCellNbr / MinVolCellNbr
-  - platform: modbus_controller
-    modbus_controller_id: bms0
-    name: "max voltage cell number"
-    address: 0x1248
-    register_type: holding
-    value_type: U_WORD
-    register_count: 44
-    response_size: 44
-    unit_of_measurement: ""
-    state_class: measurement
-    accuracy_decimals: 0
-    bitmask: 0xFF00
-    filters:
-      - offset: 1.0
-
-  - platform: modbus_controller
-    modbus_controller_id: bms0
-    name: "min voltage cell number"
-    address: 0x1248
-    register_type: holding
-    value_type: U_WORD
-    register_count: 2
-    response_size: 2
-    unit_of_measurement: ""
-    state_class: measurement
-    accuracy_decimals: 0
-    bitmask: 0x00FF
-    filters:
-      - offset: 1.0
 
 
   # Comment out following part if you don't want monitor wire resistance
@@ -1448,7 +1517,7 @@ sensor:
   # 0x12A8   168    INT32    2    R    SOCCapRemain    mAH
   - platform: modbus_controller
     modbus_controller_id: bms0
-    name: "capacity remaining derived"
+    name: "capacity remaining"
     address: 0x12A8
     register_type: holding
     value_type: U_DWORD
@@ -1464,7 +1533,7 @@ sensor:
   # 0x12AC   172   UINT32    4    R    SOCFullChargeCap    mAH
   - platform: modbus_controller
     modbus_controller_id: bms0
-    name: "actual battery capacity"
+    name: "full charge capacity"
     address: 0x12AC
     register_type: holding
     value_type: U_DWORD

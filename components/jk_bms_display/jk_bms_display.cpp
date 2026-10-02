@@ -100,7 +100,7 @@ void JkBmsDisplay::on_jk_bms_display_status_data_(const std::vector<uint8_t> &da
     return (uint16_t(data[i + 0]) << 8) | (uint16_t(data[i + 1]) << 0);
   };
 
-  ESP_LOGI(TAG, "Status frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Status frame (%zu bytes) received", data.size());
   ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint8_t offset = 6;
@@ -217,7 +217,7 @@ void JkBmsDisplay::on_jk_bms_display_raw_data_(const std::vector<uint8_t> &data)
     return (uint16_t(data[i + 0]) << 8) | (uint16_t(data[i + 1]) << 0);
   };
 
-  ESP_LOGD(TAG, "Raw data (%d bytes) received", data.size());
+  ESP_LOGD(TAG, "Raw data (%zu bytes) received", data.size());
   ESP_LOGD(TAG, "  %s", format_hex_pretty(&data.front(), data.size()).c_str());  // NOLINT
 
   uint16_t address = jk_bms_get_16bit(4);
@@ -286,8 +286,6 @@ void JkBmsDisplay::dump_config() {
   LOG_SENSOR("", "Max Cell Voltage", this->max_cell_voltage_sensor_);
   LOG_SENSOR("", "Min Voltage Cell", this->min_voltage_cell_sensor_);
   LOG_SENSOR("", "Max Voltage Cell", this->max_voltage_cell_sensor_);
-
-  this->check_uart_settings(2400);
 }
 
 float JkBmsDisplay::get_setup_priority() const {

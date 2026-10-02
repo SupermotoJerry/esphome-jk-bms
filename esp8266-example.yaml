@@ -11,7 +11,7 @@ esphome:
   comment: ${device_description}
   project:
     name: "syssi.esphome-jk-bms"
-    version: 2.4.0
+    version: 3.0.0
 
 esp8266:
   board: d1_mini
@@ -23,6 +23,7 @@ external_components:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  min_auth_mode: WPA2
 
 ota:
   platform: esphome
@@ -57,6 +58,11 @@ jk_bms:
   - id: bms0
     jk_modbus_id: modbus0
     update_interval: 5s
+    # Override the label of one or more error bits (bit 0-15).
+    # An empty label suppresses the bit entirely.
+    #
+    # error_overrides:
+    #   0: "Low SoC"
 
 binary_sensor:
   - platform: jk_bms
@@ -135,8 +141,8 @@ sensor:
       name: "cell voltage 23"
     cell_voltage_24:
       name: "cell voltage 24"
-    power_tube_temperature:
-      name: "power tube temperature"
+    mosfet_temperature:
+      name: "mosfet temperature"
     temperature_sensor_1:
       name: "temperature sensor 1"
     temperature_sensor_2:
@@ -151,17 +157,17 @@ sensor:
       name: "charging power"
     discharging_power:
       name: "discharging power"
+    state_of_charge:
+      name: "state of charge"
     capacity_remaining:
       name: "capacity remaining"
-    capacity_remaining_derived:
-      name: "capacity remaining derived"
-    temperature_sensors:
+    temperature_sensor_count:
       name: "temperature sensors"
     charging_cycles:
       name: "charging cycles"
     total_charging_cycle_capacity:
       name: "total charging cycle capacity"
-    battery_strings:
+    cell_count:
       name: "battery strings"
     errors_bitmask:
       name: "errors bitmask"
@@ -183,7 +189,7 @@ sensor:
       name: "cell voltage undervoltage recovery"
     cell_voltage_undervoltage_delay:
       name: "cell voltage undervoltage delay"
-    cell_pressure_difference_protection:
+    cell_voltage_difference_protection:
       name: "cell pressure difference protection"
     discharging_overcurrent_protection:
       name: "discharging overcurrent protection"
@@ -193,42 +199,42 @@ sensor:
       name: "charging overcurrent protection"
     charging_overcurrent_delay:
       name: "charging overcurrent delay"
-    balance_starting_voltage:
-      name: "balance starting voltage"
-    balance_opening_pressure_difference:
+    balancing_start_voltage:
+      name: "balancing start voltage"
+    balancing_delta_voltage:
       name: "balance opening pressure difference"
-    power_tube_temperature_protection:
-      name: "power tube temperature protection"
-    power_tube_temperature_recovery:
-      name: "power tube temperature recovery"
-    temperature_sensor_temperature_protection:
-      name: "temperature sensor temperature protection"
-    temperature_sensor_temperature_recovery:
-      name: "temperature sensor temperature recovery"
-    temperature_sensor_temperature_difference_protection:
-      name: "temperature sensor temperature difference protection"
-    charging_high_temperature_protection:
-      name: "charging high temperature protection"
-    discharging_high_temperature_protection:
-      name: "discharging high temperature protection"
-    charging_low_temperature_protection:
-      name: "charging low temperature protection"
-    charging_low_temperature_recovery:
-      name: "charging low temperature recovery"
-    discharging_low_temperature_protection:
-      name: "discharging low temperature protection"
-    discharging_low_temperature_recovery:
-      name: "discharging low temperature recovery"
-    total_battery_capacity_setting:
-      name: "total battery capacity setting"
+    mosfet_overtemperature_protection:
+      name: "mosfet overtemperature protection"
+    mosfet_overtemperature_recovery:
+      name: "mosfet overtemperature recovery"
+    battery_overtemperature_protection:
+      name: "battery overtemperature protection"
+    battery_overtemperature_recovery:
+      name: "battery overtemperature recovery"
+    battery_temperature_difference_protection:
+      name: "battery temperature difference protection"
+    charging_overtemperature_protection:
+      name: "charging overtemperature protection"
+    discharging_overtemperature_protection:
+      name: "discharging overtemperature protection"
+    charging_undertemperature_protection:
+      name: "charging undertemperature protection"
+    charging_undertemperature_recovery:
+      name: "charging undertemperature recovery"
+    discharging_undertemperature_protection:
+      name: "discharging undertemperature protection"
+    discharging_undertemperature_recovery:
+      name: "discharging undertemperature recovery"
+    full_charge_capacity:
+      name: "full charge capacity"
     current_calibration:
       name: "current calibration"
     device_address:
       name: "device address"
     sleep_wait_time:
       name: "sleep wait time"
-    alarm_low_volume:
-      name: "alarm low volume"
+    low_soc_alarm_threshold:
+      name: "Low SOC alarm threshold"
     manufacturing_date:
       name: "manufacturing date"
     total_runtime:

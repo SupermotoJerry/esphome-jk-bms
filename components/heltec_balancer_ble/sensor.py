@@ -3,6 +3,7 @@ from esphome.components import sensor
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_CURRENT,
+    DEVICE_CLASS_BATTERY,
     DEVICE_CLASS_CURRENT,
     DEVICE_CLASS_EMPTY,
     DEVICE_CLASS_TEMPERATURE,
@@ -15,6 +16,9 @@ from esphome.const import (
     UNIT_AMPERE,
     UNIT_CELSIUS,
     UNIT_EMPTY,
+    UNIT_OHM,
+    UNIT_PERCENT,
+    UNIT_SECOND,
     UNIT_VOLT,
 )
 
@@ -32,7 +36,13 @@ CONF_AVERAGE_CELL_VOLTAGE = "average_cell_voltage"
 CONF_TOTAL_VOLTAGE = "total_voltage"
 CONF_TEMPERATURE_SENSOR_1 = "temperature_sensor_1"
 CONF_TEMPERATURE_SENSOR_2 = "temperature_sensor_2"
+CONF_MOSFET_TEMPERATURE = "mosfet_temperature"
+CONF_BALANCER_TEMPERATURE = "balancer_temperature"
+CONF_NOMINAL_CAPACITY = "nominal_capacity"
+CONF_CAPACITY_REMAINING = "capacity_remaining"
+CONF_STATE_OF_CHARGE = "state_of_charge"
 CONF_TOTAL_RUNTIME = "total_runtime"
+CONF_POWER_ON_COUNT = "power_on_count"
 CONF_BALANCING_CURRENT = "balancing_current"
 CONF_ERRORS_BITMASK = "errors_bitmask"
 CONF_CELL_DETECTION_FAILED_BITMASK = "cell_detection_failed_bitmask"
@@ -42,11 +52,9 @@ CONF_CELL_POLARITY_ERROR_BITMASK = "cell_polarity_error_bitmask"
 CONF_CELL_EXCESSIVE_LINE_RESISTANCE_BITMASK = "cell_excessive_line_resistance_bitmask"
 
 UNIT_AMPERE_HOURS = "Ah"
-UNIT_OHM = "Ω"
-UNIT_SECONDS = "s"
-
 ICON_CURRENT_DC = "mdi:current-dc"
 ICON_CELL_RESISTANCE = "mdi:omega"
+ICON_POWER_ON_COUNT = "mdi:power-cycle"
 
 CELL_VOLTAGES = [f"cell_voltage_{i}" for i in range(1, 25)]
 CELL_RESISTANCES = [f"cell_resistance_{i}" for i in range(1, 25)]
@@ -138,9 +146,51 @@ SENSOR_DEFS = {
         "device_class": DEVICE_CLASS_TEMPERATURE,
         "state_class": STATE_CLASS_MEASUREMENT,
     },
+    CONF_MOSFET_TEMPERATURE: {
+        "unit_of_measurement": UNIT_CELSIUS,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 2,
+        "device_class": DEVICE_CLASS_TEMPERATURE,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_BALANCER_TEMPERATURE: {
+        "unit_of_measurement": UNIT_CELSIUS,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 2,
+        "device_class": DEVICE_CLASS_TEMPERATURE,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_NOMINAL_CAPACITY: {
+        "unit_of_measurement": UNIT_AMPERE_HOURS,
+        "icon": "mdi:battery",
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_CAPACITY_REMAINING: {
+        "unit_of_measurement": UNIT_AMPERE_HOURS,
+        "icon": "mdi:battery",
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
+    CONF_STATE_OF_CHARGE: {
+        "unit_of_measurement": UNIT_PERCENT,
+        "icon": ICON_EMPTY,
+        "accuracy_decimals": 1,
+        "device_class": DEVICE_CLASS_BATTERY,
+        "state_class": STATE_CLASS_MEASUREMENT,
+    },
     CONF_TOTAL_RUNTIME: {
-        "unit_of_measurement": UNIT_SECONDS,
+        "unit_of_measurement": UNIT_SECOND,
         "icon": ICON_TIMELAPSE,
+        "accuracy_decimals": 0,
+        "device_class": DEVICE_CLASS_EMPTY,
+        "state_class": STATE_CLASS_TOTAL_INCREASING,
+    },
+    CONF_POWER_ON_COUNT: {
+        "unit_of_measurement": UNIT_EMPTY,
+        "icon": ICON_POWER_ON_COUNT,
         "accuracy_decimals": 0,
         "device_class": DEVICE_CLASS_EMPTY,
         "state_class": STATE_CLASS_TOTAL_INCREASING,

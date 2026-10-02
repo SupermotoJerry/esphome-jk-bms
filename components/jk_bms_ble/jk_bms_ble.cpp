@@ -1,6 +1,7 @@
 #include "jk_bms_ble.h"
 #include "esphome/core/log.h"
 #include "esphome/core/version.h"
+#include <cinttypes>
 
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 12, 0)
 #define ADDR_STR(x) x
@@ -10,7 +11,7 @@
 
 namespace esphome::jk_bms_ble {
 
-static const char *const TAG = "jk_bms_ble";
+static constexpr const char *const TAG = "jk_bms_ble";
 
 static const uint8_t MAX_NO_RESPONSE_COUNT = 10;
 
@@ -23,28 +24,268 @@ static const uint16_t JK_BMS_CHARACTERISTIC_UUID = 0xFFE1;
 
 static const uint8_t COMMAND_CELL_INFO = 0x96;
 static const uint8_t COMMAND_DEVICE_INFO = 0x97;
+static const uint8_t COMMAND_LOGBOOK = 0xA1;
 
 static const uint16_t MIN_RESPONSE_SIZE = 300;
 static const uint16_t MAX_RESPONSE_SIZE = 384 + 16;
 
-static const uint8_t ERRORS_SIZE = 16;
-static constexpr const char *const ERRORS[ERRORS_SIZE] = {
-    "Charge Overtemperature",               // 0000 0000 0000 0001
-    "Charge Undertemperature",              // 0000 0000 0000 0010
-    "Coprocessor communication error",      // 0000 0000 0000 0100
-    "Cell Undervoltage",                    // 0000 0000 0000 1000
-    "Battery pack undervoltage",            // 0000 0000 0001 0000
-    "Discharge overcurrent",                // 0000 0000 0010 0000
-    "Discharge short circuit",              // 0000 0000 0100 0000
-    "Discharge overtemperature",            // 0000 0000 1000 0000
-    "Wire resistance",                      // 0000 0001 0000 0000
-    "Mosfet overtemperature",               // 0000 0010 0000 0000
-    "Cell count is not equal to settings",  // 0000 0100 0000 0000
-    "Current sensor anomaly",               // 0000 1000 0000 0000
-    "Cell Overvoltage",                     // 0001 0000 0000 0000
-    "Battery pack overvoltage",             // 0010 0000 0000 0000
-    "Charge overcurrent protection",        // 0100 0000 0000 0000
-    "Charge short circuit",                 // 1000 0000 0000 0000
+static constexpr const char *const LOGBOOK_CODES[] = {
+    "",                                                    // 0x00
+    "Boot",                                                // 0x01
+    "Shutdown",                                            // 0x02
+    "APP close charge",                                    // 0x03
+    "APP open charge",                                     // 0x04
+    "APP close discharge",                                 // 0x05
+    "APP open discharge",                                  // 0x06
+    "Remote close charge",                                 // 0x07
+    "Remote open charge",                                  // 0x08
+    "Remote close discharge",                              // 0x09
+    "Remote open discharge",                               // 0x0A
+    "MOS over temperature protection",                     // 0x0B
+    "MOS over-temperature protection is released",         // 0x0C
+    "Abnormal current sensor",                             // 0x0D
+    "Abnormal release of current sensor",                  // 0x0E
+    "Abnormal coprocessor communication",                  // 0x0F
+    "Abnormal cancellation of coprocessor communication",  // 0x10
+    "Cell overcharge protection",                          // 0x11
+    "Cell overcharge protection is released",              // 0x12
+    "Battery overcharge protection",                       // 0x13
+    "Battery overcharge protection is released",           // 0x14
+    "Charge overcurrent protection",                       // 0x15
+    "Charge overcurrent protection is released",           // 0x16
+    "Charge short circuit protection",                     // 0x17
+    "Charge short circuit protection is released",         // 0x18
+    "Charge over temperature protection",                  // 0x19
+    "Charge over temperature protection is released",      // 0x1A
+    "Charge low temperature protection",                   // 0x1B
+    "Charge low temperature protection is released",       // 0x1C
+    "Cell undervoltage protection",                        // 0x1D
+    "Cell undervoltage protection is released",            // 0x1E
+    "Battery undervoltage protection",                     // 0x1F
+    "Battery undervoltage protection is released",         // 0x20
+    "Discharge overcurrent protection",                    // 0x21
+    "Discharge overcurrent protection is released",        // 0x22
+    "Discharge short circuit protection",                  // 0x23
+    "Discharge short circuit protection released",         // 0x24
+    "Discharge over temperature protection",               // 0x25
+    "Discharge over-temperature protection is released",   // 0x26
+    "Reset Watch-Dog",                                     // 0x27
+    "Discharge level 2 short circuit protection",          // 0x28
+    "Manually enable the emergency mode",                  // 0x29
+    "Manually turn off the emergency mode",                // 0x2A
+    "Turn off the emergency mode automatically",           // 0x2B
+    "APP to turn it off",                                  // 0x2C
+    "Button to turn it off",                               // 0x2D
+    "Discharge On Failed",                                 // 0x2E
+    "RS485 power off",                                     // 0x2F
+    "CAN charge off",                                      // 0x30
+    "CAN charge on",                                       // 0x31
+    "CAN discharge off",                                   // 0x32
+    "CAN discharge on",                                    // 0x33
+    "RS485 charge off",                                    // 0x34
+    "RS485 charge on",                                     // 0x35
+    "RS485 discharge off",                                 // 0x36
+    "RS485 discharge on",                                  // 0x37
+    "Enter sleep",                                         // 0x38
+    "Charge MOS abnormal",                                 // 0x39
+    "Discharge MOS abnormal",                              // 0x3A
+    "Time calibration",                                    // 0x3B
+    "Cells Count Incorrect",                               // 0x3C
+    "Button Emergency On",                                 // 0x3D
+    "Button Emergency Off",                                // 0x3E
+    "Button Forced Heating",                               // 0x3F
+    "Discharge OCP II",                                    // 0x40
+    "Discharge OCP III",                                   // 0x41
+    "SCP Release Failed",                                  // 0x42
+    "Factory setting LION",                                // 0x43
+    "Factory setting LFP",                                 // 0x44
+    "Factory setting LTO",                                 // 0x45
+    "Remote Emergency On",                                 // 0x46
+    "Remote Emergency Off",                                // 0x47
+    "Discharge under temperature protection",              // 0x48
+    "Discharge under temperature protection Release",      // 0x49
+    "",                                                    // 0x4A
+    "",                                                    // 0x4B
+    "",                                                    // 0x4C
+    "",                                                    // 0x4D
+    "",                                                    // 0x4E
+    "",                                                    // 0x4F
+    "",                                                    // 0x50
+    "",                                                    // 0x51
+    "",                                                    // 0x52
+    "",                                                    // 0x53
+    "",                                                    // 0x54
+    "",                                                    // 0x55
+    "",                                                    // 0x56
+    "",                                                    // 0x57
+    "",                                                    // 0x58
+    "",                                                    // 0x59
+    "",                                                    // 0x5A
+    "",                                                    // 0x5B
+    "",                                                    // 0x5C
+    "",                                                    // 0x5D
+    "",                                                    // 0x5E
+    "",                                                    // 0x5F
+    "",                                                    // 0x60
+    "",                                                    // 0x61
+    "",                                                    // 0x62
+    "",                                                    // 0x63
+    "Cell 01 over charge protection",                      // 0x64
+    "Cell 02 over charge protection",                      // 0x65
+    "Cell 03 over charge protection",                      // 0x66
+    "Cell 04 over charge protection",                      // 0x67
+    "Cell 05 over charge protection",                      // 0x68
+    "Cell 06 over charge protection",                      // 0x69
+    "Cell 07 over charge protection",                      // 0x6A
+    "Cell 08 over charge protection",                      // 0x6B
+    "Cell 09 over charge protection",                      // 0x6C
+    "Cell 10 over charge protection",                      // 0x6D
+    "Cell 11 over charge protection",                      // 0x6E
+    "Cell 12 over charge protection",                      // 0x6F
+    "Cell 13 over charge protection",                      // 0x70
+    "Cell 14 over charge protection",                      // 0x71
+    "Cell 15 over charge protection",                      // 0x72
+    "Cell 16 over charge protection",                      // 0x73
+    "Cell 17 over charge protection",                      // 0x74
+    "Cell 18 over charge protection",                      // 0x75
+    "Cell 19 over charge protection",                      // 0x76
+    "Cell 20 over charge protection",                      // 0x77
+    "Cell 21 over charge protection",                      // 0x78
+    "Cell 22 over charge protection",                      // 0x79
+    "Cell 23 over charge protection",                      // 0x7A
+    "Cell 24 over charge protection",                      // 0x7B
+    "Cell 25 over charge protection",                      // 0x7C
+    "Cell 26 over charge protection",                      // 0x7D
+    "Cell 27 over charge protection",                      // 0x7E
+    "Cell 28 over charge protection",                      // 0x7F
+    "Cell 29 over charge protection",                      // 0x80
+    "Cell 30 over charge protection",                      // 0x81
+    "Cell 31 over charge protection",                      // 0x82
+    "Cell 32 over charge protection",                      // 0x83
+    "",                                                    // 0x84
+    "",                                                    // 0x85
+    "",                                                    // 0x86
+    "",                                                    // 0x87
+    "",                                                    // 0x88
+    "",                                                    // 0x89
+    "",                                                    // 0x8A
+    "",                                                    // 0x8B
+    "",                                                    // 0x8C
+    "",                                                    // 0x8D
+    "",                                                    // 0x8E
+    "",                                                    // 0x8F
+    "",                                                    // 0x90
+    "",                                                    // 0x91
+    "",                                                    // 0x92
+    "",                                                    // 0x93
+    "",                                                    // 0x94
+    "",                                                    // 0x95
+    "",                                                    // 0x96
+    "",                                                    // 0x97
+    "",                                                    // 0x98
+    "",                                                    // 0x99
+    "",                                                    // 0x9A
+    "",                                                    // 0x9B
+    "",                                                    // 0x9C
+    "",                                                    // 0x9D
+    "",                                                    // 0x9E
+    "",                                                    // 0x9F
+    "",                                                    // 0xA0
+    "",                                                    // 0xA1
+    "",                                                    // 0xA2
+    "",                                                    // 0xA3
+    "",                                                    // 0xA4
+    "",                                                    // 0xA5
+    "",                                                    // 0xA6
+    "",                                                    // 0xA7
+    "",                                                    // 0xA8
+    "",                                                    // 0xA9
+    "",                                                    // 0xAA
+    "",                                                    // 0xAB
+    "",                                                    // 0xAC
+    "",                                                    // 0xAD
+    "",                                                    // 0xAE
+    "",                                                    // 0xAF
+    "",                                                    // 0xB0
+    "",                                                    // 0xB1
+    "",                                                    // 0xB2
+    "",                                                    // 0xB3
+    "",                                                    // 0xB4
+    "",                                                    // 0xB5
+    "",                                                    // 0xB6
+    "",                                                    // 0xB7
+    "",                                                    // 0xB8
+    "",                                                    // 0xB9
+    "",                                                    // 0xBA
+    "",                                                    // 0xBB
+    "",                                                    // 0xBC
+    "",                                                    // 0xBD
+    "",                                                    // 0xBE
+    "",                                                    // 0xBF
+    "",                                                    // 0xC0
+    "",                                                    // 0xC1
+    "",                                                    // 0xC2
+    "",                                                    // 0xC3
+    "",                                                    // 0xC4
+    "",                                                    // 0xC5
+    "",                                                    // 0xC6
+    "",                                                    // 0xC7
+    "Cell 01 over discharge protection",                   // 0xC8
+    "Cell 02 over discharge protection",                   // 0xC9
+    "Cell 03 over discharge protection",                   // 0xCA
+    "Cell 04 over discharge protection",                   // 0xCB
+    "Cell 05 over discharge protection",                   // 0xCC
+    "Cell 06 over discharge protection",                   // 0xCD
+    "Cell 07 over discharge protection",                   // 0xCE
+    "Cell 08 over discharge protection",                   // 0xCF
+    "Cell 09 over discharge protection",                   // 0xD0
+    "Cell 10 over discharge protection",                   // 0xD1
+    "Cell 11 over discharge protection",                   // 0xD2
+    "Cell 12 over discharge protection",                   // 0xD3
+    "Cell 13 over discharge protection",                   // 0xD4
+    "Cell 14 over discharge protection",                   // 0xD5
+    "Cell 15 over discharge protection",                   // 0xD6
+    "Cell 16 over discharge protection",                   // 0xD7
+    "Cell 17 over discharge protection",                   // 0xD8
+    "Cell 18 over discharge protection",                   // 0xD9
+    "Cell 19 over discharge protection",                   // 0xDA
+    "Cell 20 over discharge protection",                   // 0xDB
+    "Cell 21 over discharge protection",                   // 0xDC
+    "Cell 22 over discharge protection",                   // 0xDD
+    "Cell 23 over discharge protection",                   // 0xDE
+    "Cell 24 over discharge protection",                   // 0xDF
+    "Cell 25 over discharge protection",                   // 0xE0
+    "Cell 26 over discharge protection",                   // 0xE1
+    "Cell 27 over discharge protection",                   // 0xE2
+    "Cell 28 over discharge protection",                   // 0xE3
+    "Cell 29 over discharge protection",                   // 0xE4
+    "Cell 30 over discharge protection",                   // 0xE5
+    "Cell 31 over discharge protection",                   // 0xE6
+    "Cell 32 over discharge protection",                   // 0xE7
+    "",                                                    // 0xE8
+    "",                                                    // 0xE9
+    "",                                                    // 0xEA
+    "",                                                    // 0xEB
+    "",                                                    // 0xEC
+    "",                                                    // 0xED
+    "",                                                    // 0xEE
+    "",                                                    // 0xEF
+    "",                                                    // 0xF0
+    "",                                                    // 0xF1
+    "",                                                    // 0xF2
+    "",                                                    // 0xF3
+    "",                                                    // 0xF4
+    "",                                                    // 0xF5
+    "",                                                    // 0xF6
+    "",                                                    // 0xF7
+    "",                                                    // 0xF8
+    "",                                                    // 0xF9
+    "",                                                    // 0xFA
+    "",                                                    // 0xFB
+    "",                                                    // 0xFC
+    "",                                                    // 0xFD
+    "",                                                    // 0xFE
+    "",                                                    // 0xFF
 };
 
 uint8_t crc(const uint8_t data[], const uint16_t len) {
@@ -142,33 +383,39 @@ void JkBmsBle::dump_config() {  // NOLINT(google-readability-function-size,reada
   LOG_SENSOR("", "Power", this->power_sensor_);
   LOG_SENSOR("", "Charging Power", this->charging_power_sensor_);
   LOG_SENSOR("", "Discharging Power", this->discharging_power_sensor_);
-  LOG_SENSOR("", "Power Tube Temperature", this->power_tube_temperature_sensor_);
+  LOG_SENSOR("", "Mosfet Temperature", this->mosfet_temperature_sensor_);
   LOG_SENSOR("", "Temperature Sensor 1", this->temperatures_[0].temperature_sensor_);
   LOG_SENSOR("", "Temperature Sensor 2", this->temperatures_[1].temperature_sensor_);
   LOG_SENSOR("", "Temperature Sensor 3", this->temperatures_[2].temperature_sensor_);
   LOG_SENSOR("", "Temperature Sensor 4", this->temperatures_[3].temperature_sensor_);
   LOG_SENSOR("", "Temperature Sensor 5", this->temperatures_[4].temperature_sensor_);
-  LOG_SENSOR("", "Balancing", this->balancing_sensor_);
+  LOG_SENSOR("", "Balancer Status Bitmask", this->balancer_status_bitmask_sensor_);
   LOG_SENSOR("", "State Of Charge", this->state_of_charge_sensor_);
   LOG_SENSOR("", "State Of Health", this->state_of_health_sensor_);
   LOG_SENSOR("", "Capacity Remaining", this->capacity_remaining_sensor_);
-  LOG_SENSOR("", "Total Battery Capacity Setting", this->total_battery_capacity_setting_sensor_);
+  LOG_SENSOR("", "Full Charge Capacity", this->full_charge_capacity_sensor_);
   LOG_SENSOR("", "Charging Cycles", this->charging_cycles_sensor_);
   LOG_SENSOR("", "Total Charging Cycle Capacity", this->total_charging_cycle_capacity_sensor_);
   LOG_SENSOR("", "Total Runtime", this->total_runtime_sensor_);
+  LOG_SENSOR("", "Power On Count", this->power_on_count_sensor_);
   LOG_SENSOR("", "Heating Current", this->heating_current_sensor_);
   LOG_SENSOR("", "Balancing Current", this->balancing_current_sensor_);
-  LOG_SENSOR("", "Errors Bitmask", this->errors_bitmask_sensor_);
   LOG_SENSOR("", "Emergency Time Countdown", this->emergency_time_countdown_sensor_);
   LOG_SENSOR("", "Charge Status ID", this->charge_status_id_sensor_);
   LOG_SENSOR("", "Charge Status Time Elapsed", this->charge_status_time_elapsed_sensor_);
+  LOG_SENSOR("", "Battery Type ID", this->battery_type_id_sensor_);
 
-  LOG_TEXT_SENSOR("", "Operation Status", this->operation_status_text_sensor_);
+  LOG_TEXT_SENSOR("", "Balancer Status", this->balancer_status_text_sensor_);
   LOG_TEXT_SENSOR("", "Total Runtime Formatted", this->total_runtime_formatted_text_sensor_);
   LOG_TEXT_SENSOR("", "Errors", this->errors_text_sensor_);
+  LOG_TEXT_SENSOR("", "Errors Bitmask Hex", this->errors_bitmask_hex_text_sensor_);
   LOG_TEXT_SENSOR("", "Charge Status", this->charge_status_text_sensor_);
   LOG_TEXT_SENSOR("", "Software Version", this->software_version_text_sensor_);
   LOG_TEXT_SENSOR("", "Hardware Version", this->hardware_version_text_sensor_);
+  LOG_TEXT_SENSOR("", "Battery Type", this->battery_type_text_sensor_);
+  LOG_TEXT_SENSOR("", "Device Model", this->device_model_text_sensor_);
+  LOG_TEXT_SENSOR("", "Manufacturing Date", this->manufacturing_date_text_sensor_);
+  LOG_TEXT_SENSOR("", "Serial Number", this->serial_number_text_sensor_);
 }
 
 #ifdef USE_ESP32
@@ -298,32 +545,12 @@ void JkBmsBle::update() {
 }
 
 bool JkBmsBle::write_register(uint8_t address, uint32_t value, uint8_t length) {
-  uint8_t frame[20];
-  frame[0] = 0xAA;     // start sequence
-  frame[1] = 0x55;     // start sequence
-  frame[2] = 0x90;     // start sequence
-  frame[3] = 0xEB;     // start sequence
-  frame[4] = address;  // holding register
-  frame[5] = length;   // size of the value in byte
-  frame[6] = value >> 0;
-  frame[7] = value >> 8;
-  frame[8] = value >> 16;
-  frame[9] = value >> 24;
-  frame[10] = 0x00;
-  frame[11] = 0x00;
-  frame[12] = 0x00;
-  frame[13] = 0x00;
-  frame[14] = 0x00;
-  frame[15] = 0x00;
-  frame[16] = 0x00;
-  frame[17] = 0x00;
-  frame[18] = 0x00;
-  frame[19] = crc(frame, sizeof(frame) - 1);
+  auto frame = build_frame(address, value, length);
 
-  ESP_LOGD(TAG, "Write register: %s", format_hex_pretty(frame, sizeof(frame)).c_str());  // NOLINT
+  ESP_LOGD(TAG, "Write register: %s", format_hex_pretty(frame.data(), frame.size()).c_str());  // NOLINT
   auto status =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_handle_,
-                               sizeof(frame), frame, ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
+                               frame.size(), frame.data(), ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
 
   if (status) {
     ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
@@ -337,6 +564,31 @@ bool JkBmsBle::write_register(uint8_t address, uint32_t value, uint8_t length) {
 void JkBmsBle::update() {}
 
 #endif  // USE_ESP32
+
+std::array<uint8_t, 20> JkBmsBle::build_frame(uint8_t address, uint32_t value, uint8_t length) {
+  std::array<uint8_t, 20> frame{};
+  frame[0] = 0xAA;     // start sequence
+  frame[1] = 0x55;     // start sequence
+  frame[2] = 0x90;     // start sequence
+  frame[3] = 0xEB;     // start sequence
+  frame[4] = address;  // holding register
+  frame[5] = length;   // size of the value in byte
+  frame[6] = value >> 0;
+  frame[7] = value >> 8;
+  frame[8] = value >> 16;
+  frame[9] = value >> 24;
+  frame[19] = crc(frame.data(), frame.size() - 1);
+  return frame;
+}
+
+uint32_t JkBmsBle::encode_jk04_payload(float value, uint8_t len, float factor) {
+  if (len == 4) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    return bits;
+  }
+  return (uint32_t) (int32_t) (value * factor);
+}
 
 // TODO: There is no need to assemble frames if the MTU can be increased to > 320 bytes
 void JkBmsBle::assemble(const uint8_t *data, uint16_t length) {
@@ -394,6 +646,9 @@ void JkBmsBle::decode_(const std::vector<uint8_t> &data) {
     case 0x03:
       this->decode_device_info_(data);
       break;
+    case 0x05:
+      this->decode_logbook_(data);
+      break;
     default:
       ESP_LOGW(TAG, "Unsupported message type (0x%02X)", data[4]);
   }
@@ -418,7 +673,7 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
     offset = 16;
   }
 
-  ESP_LOGI(TAG, "Cell info frame (version %d, %d bytes) received", frame_version, data.size());
+  ESP_LOGI(TAG, "Cell info frame (version %d, %zu bytes) received", frame_version, data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());                      // NOLINT
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());  // NOLINT
 
@@ -524,7 +779,7 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
 
   // 112   2   0x00 0x00              Unknown112
   if (frame_version == FRAME_VERSION_JK02_32S) {
-    this->publish_state_(this->power_tube_temperature_sensor_, (float) ((int16_t) jk_get_16bit(112 + offset)) * 0.1f);
+    this->publish_state_(this->mosfet_temperature_sensor_, (float) ((int16_t) jk_get_16bit(112 + offset)) * 0.1f);
   } else {
     ESP_LOGD(TAG, "Unknown112: 0x%02X 0x%02X", data[112 + offset], data[113 + offset]);
   }
@@ -559,39 +814,22 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
 
   // 134   2   0xD2 0x00              MOS Temperature       0.1          °C
   if (frame_version == FRAME_VERSION_JK02_32S) {
-    uint16_t raw_errors_bitmask = (uint16_t(data[134 + offset]) << 8) | (uint16_t(data[134 + 1 + offset]) << 0);
-    this->publish_state_(this->errors_bitmask_sensor_, (float) raw_errors_bitmask);
-    this->publish_state_(this->errors_text_sensor_, this->error_bits_to_string_(raw_errors_bitmask));
+    // 166-169: errors bitmask, little-endian 32-bit
+    uint32_t raw_errors_bitmask = jk_get_32bit(134 + offset);
+    this->publish_state_(this->errors_bitmask_hex_text_sensor_, this->to_hex_string_(raw_errors_bitmask));
+    this->publish_state_(this->errors_text_sensor_,
+                         this->error_bits_to_string_(raw_errors_bitmask, this->errors_jk02_table_, 32));
   } else {
-    this->publish_state_(this->power_tube_temperature_sensor_, (float) ((int16_t) jk_get_16bit(134 + offset)) * 0.1f);
+    this->publish_state_(this->mosfet_temperature_sensor_, (float) ((int16_t) jk_get_16bit(134 + offset)) * 0.1f);
   }
 
-  // 136   2   0x00 0x00              System alarms
-  //           0x00 0x01                Charge overtemperature               0000 0000 0000 0001
-  //           0x00 0x02                Charge undertemperature              0000 0000 0000 0010
-  //           0x00 0x04                Coprocessor communication error      0000 0000 0000 0100
-  //           0x00 0x08                Cell undervoltage                    0000 0000 0000 1000
-  //           0x00 0x10                Battery pack undervoltage            0000 0000 0001 0000
-  //           0x00 0x20                Discharge overcurrent                0000 0000 0010 0000
-  //           0x00 0x40                Discharge short circuit              0000 0000 0100 0000
-  //           0x00 0x80                Discharge overtemperature            0000 0000 1000 0000
-  //           0x01 0x00                Wire resistance                      0000 0001 0000 0000
-  //           0x02 0x00                Mosfet overtemperature               0000 0010 0000 0000
-  //           0x04 0x00                Cell count is not equal to settings  0000 0100 0000 0000
-  //           0x08 0x00                Current sensor anomaly               0000 1000 0000 0000
-  //           0x10 0x00                Cell Overvoltage                     0001 0000 0000 0000
-  //           0x20 0x00                Battery pack overvoltage             0010 0000 0000 0000
-  //           0x40 0x00                Charge overcurrent protection        0100 0000 0000 0000
-  //           0x80 0x00                Charge short circuit                 1000 0000 0000 0000
-  //
-  //           0x14 0x00                Cell Over Voltage +                  0001 0100 0000 0000
-  //                                    Cell count is not equal to settings
-  //           0x04 0x08                Cell Undervoltage +                  0000 0100 0000 1000
-  //                                    Cell count is not equal to settings
+  // 136-137: errors bitmask (JK02_24S only), little-endian 16-bit
+  // JK02_32S extends this to 32 bits at offset 134; the upper 16 bits are not available here.
   if (frame_version != FRAME_VERSION_JK02_32S) {
-    uint16_t raw_errors_bitmask = (uint16_t(data[136 + offset]) << 8) | (uint16_t(data[136 + 1 + offset]) << 0);
-    this->publish_state_(this->errors_bitmask_sensor_, (float) raw_errors_bitmask);
-    this->publish_state_(this->errors_text_sensor_, this->error_bits_to_string_(raw_errors_bitmask));
+    uint32_t raw_errors_bitmask = jk_get_16bit(136 + offset);
+    this->publish_state_(this->errors_bitmask_hex_text_sensor_, this->to_hex_string_(raw_errors_bitmask));
+    this->publish_state_(this->errors_text_sensor_,
+                         this->error_bits_to_string_(raw_errors_bitmask, this->errors_jk02_table_, 16));
   }
 
   // 138   2   0x00 0x00              Balance current      0.001         A
@@ -600,8 +838,9 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
   // 140   1   0x00                   Balancing action                   0x00: Off
   //                                                                     0x01: Charging balancer
   //                                                                     0x02: Discharging balancer
-  this->publish_state_(this->balancing_sensor_, (data[140 + offset]));
+  this->publish_state_(this->balancer_status_bitmask_sensor_, (data[140 + offset]));
   this->publish_state_(this->balancing_binary_sensor_, (data[140 + offset] != 0x00));
+  this->publish_state_(this->balancer_status_text_sensor_, (data[140 + offset] != 0x00) ? "Balancing" : "Idle");
   ESP_LOGD(TAG, "Balancing indicator (legacy): %s", YESNO(data[140 + offset] != 0x00));
 
   // 141   1   0x54                   State of charge in   1.0           %
@@ -611,7 +850,7 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
   this->publish_state_(this->capacity_remaining_sensor_, (float) jk_get_32bit(142 + offset) * 0.001f);
 
   // 146   4   0x68 0x3C 0x01 0x00    Nominal_Capacity     0.001         Ah
-  this->publish_state_(this->total_battery_capacity_setting_sensor_, (float) jk_get_32bit(146 + offset) * 0.001f);
+  this->publish_state_(this->full_charge_capacity_sensor_, (float) jk_get_32bit(146 + offset) * 0.001f);
 
   // 150   4   0x00 0x00 0x00 0x00    Cycle_Count          1.0
   this->publish_state_(this->charging_cycles_sensor_, (float) jk_get_32bit(150 + offset));
@@ -668,15 +907,13 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
   ESP_LOGD(TAG, "Discharging current sensor voltage: %.3f", jk_get_16bit(192 + offset) * 0.001f);
   ESP_LOGD(TAG, "Battery voltage correction factor: %f", (float) jk_get_32bit(194 + offset) * 1.0f);
 
-  ESP_LOGD(TAG, "Battery voltage: %.3f", (float) ieee_float_(jk_get_32bit(202 + offset)));
+  // 202+32   2   0x30 0x14              Battery voltage       0.01         V
+  ESP_LOGD(TAG, "Battery voltage: %.2f V", (float) jk_get_16bit(202 + offset) * 0.01f);
   ESP_LOGD(TAG, "Heating current: %.3f A", (float) ((int16_t) jk_get_16bit(204 + offset)) * 0.001f);
   this->publish_state_(this->heating_current_sensor_, (float) ((int16_t) jk_get_16bit(204 + offset)) * 0.001f);
 
   ESP_LOGD(TAG, "Charger Plugged: %s", ONOFF((bool) data[213 + offset]));
-  ESP_LOGD(TAG, "Temperature sensor 3: %.1f °C", (float) jk_get_16bit(222 + offset) * 0.1f);
-  ESP_LOGD(TAG, "Temperature sensor 4: %.1f °C", (float) jk_get_16bit(224 + offset) * 0.1f);
-  ESP_LOGD(TAG, "Temperature sensor 5: %.1f °C", (float) jk_get_16bit(226 + offset) * 0.1f);
-  ESP_LOGD(TAG, "Time enter sleep: %lu s", (unsigned long) jk_get_32bit(238 + offset));
+  this->publish_state_(this->smart_sleep_countdown_sensor_, (float) jk_get_32bit(238 + offset));
   ESP_LOGD(TAG, "PCL Module State: %s", ONOFF((bool) data[242 + offset]));
 
   if (frame_version == FRAME_VERSION_JK02_32S) {
@@ -698,6 +935,13 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
                          (float) ((int16_t) jk_get_16bit(224 + offset)) * 0.1f);
     this->publish_state_(this->temperatures_[2].temperature_sensor_,
                          (float) ((int16_t) jk_get_16bit(226 + offset)) * 0.1f);
+
+    // 234+32  4   0x3E 0x00 0x00 0x00    Detail log count     1
+    this->publish_state_(this->detail_log_entry_count_sensor_, (float) jk_get_32bit(234 + offset));
+
+    // 243+32  1   0x00                   Battery type code    0=LFP, 1=Li-ion, 2=LTO
+    this->publish_state_(this->battery_type_id_sensor_, (float) data[243 + offset]);
+    this->publish_state_(this->battery_type_text_sensor_, this->battery_type_id_to_string_(data[243 + offset]));
 
     // 246+32  2   0x00 0x00              Charge status time
     this->publish_state_(this->charge_status_time_elapsed_sensor_, (float) jk_get_16bit(246 + offset));
@@ -726,7 +970,7 @@ void JkBmsBle::decode_jk04_cell_info_(const std::vector<uint8_t> &data) {
   }
   this->last_cell_info_ = now;
 
-  ESP_LOGI(TAG, "Cell info frame (JK04, %d bytes) received", data.size());
+  ESP_LOGI(TAG, "Cell info frame (JK04, %zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());                      // NOLINT
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());  // NOLINT
 
@@ -859,7 +1103,8 @@ void JkBmsBle::decode_jk04_cell_info_(const std::vector<uint8_t> &data) {
   // 220   1   0x00                  Blink cells (0x00: Off, 0x01: Charging balancer, 0x02: Discharging balancer)
   bool balancing = (data[220] != 0x00);
   this->publish_state_(this->balancing_binary_sensor_, balancing);
-  this->publish_state_(this->operation_status_text_sensor_, (balancing) ? "Balancing" : "Idle");
+  this->publish_state_(this->balancer_status_bitmask_sensor_, (float) data[220]);
+  this->publish_state_(this->balancer_status_text_sensor_, balancing ? "Balancing" : "Idle");
 
   // 221   1   0x01                  Unknown221
   ESP_LOGD(TAG, "Unknown221: 0x%02X", data[221]);
@@ -885,7 +1130,8 @@ void JkBmsBle::decode_jk04_cell_info_(const std::vector<uint8_t> &data) {
   //           0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
   //           0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
   //           0x00 0x00 0x00 0x00 0x00
-  // 286   3   0x53 0x96 0x1C 0x00        Uptime
+
+  // 286   3   0x53 0x96 0x1C 0x00    Runtime
   this->publish_state_(this->total_runtime_sensor_, (float) jk_get_32bit(286));
   this->publish_state_(this->total_runtime_formatted_text_sensor_, format_total_runtime_(jk_get_32bit(286)));
 
@@ -910,7 +1156,7 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
     return (uint32_t(jk_get_16bit(i + 2)) << 16) | (uint32_t(jk_get_16bit(i + 0)) << 0);
   };
 
-  ESP_LOGI(TAG, "Settings frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Settings frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
 
@@ -1039,12 +1285,11 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
 
   // 106   4   0x84 0x03 0x00 0x00    MOS OTP
   ESP_LOGV(TAG, "  Mosfet OTP: %f °C", (float) ((int32_t) jk_get_32bit(106)) * 0.1f);
-  this->publish_state_(this->power_tube_overtemperature_protection_number_,
-                       (float) ((int32_t) jk_get_32bit(106)) * 0.1f);
+  this->publish_state_(this->mosfet_overtemperature_protection_number_, (float) ((int32_t) jk_get_32bit(106)) * 0.1f);
 
   // 110   4   0xBC 0x02 0x00 0x00    MOS OTP Recovery
   ESP_LOGV(TAG, "  Mosfet OTP recovery: %f °C", (float) ((int32_t) jk_get_32bit(110)) * 0.1f);
-  this->publish_state_(this->power_tube_overtemperature_protection_recovery_number_,
+  this->publish_state_(this->mosfet_overtemperature_protection_recovery_number_,
                        (float) ((int32_t) jk_get_32bit(110)) * 0.1f);
 
   // 114   4   0x0D 0x00 0x00 0x00    Cell count
@@ -1073,7 +1318,7 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
 
   // 138   4   0xE4 0x0C 0x00 0x00    Start balance voltage
   ESP_LOGV(TAG, "  Start balance voltage: %f V", (float) jk_get_32bit(138) * 0.001f);
-  this->publish_state_(this->balance_starting_voltage_number_, (float) jk_get_32bit(138) * 0.001f);
+  this->publish_state_(this->balancing_start_voltage_number_, (float) jk_get_32bit(138) * 0.001f);
 
   if (this->protocol_version_ == PROTOCOL_VERSION_JK02_24S) {
     ESP_LOGD(TAG, "  Unknown142: %f", (float) jk_get_32bit(142) * 0.001f);
@@ -1150,23 +1395,32 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
     //    bit7: Disable PCL module                  128
     //    bit8: Timed stored data                   256
     //    bit9: Charging float mode                 512
-    //    bit10: Reserved                          1024
-    //    bit11: Reserved                          2048
-    //    bit12: Reserved                          4096
-    //    bit13: Reserved                          8192
-    //    bit14: Reserved                         16384
-    //    bit15: Reserved                         32768
+    //    bit10: Button trigger emergency           1024
+    //    bit11: DRY ARM intermittent              2048
+    //    bit12: Discharge OCP II                  4096
+    //    bit13: Discharge OCP III                 8192
+    //    bit14: GPS locked charging              16384
+    //    bit15: GPS locked discharging           32768
     ESP_LOGI(TAG, "  Heating switch: %s", ONOFF(check_bit_(data[282], 1)));
     this->publish_state_(this->heating_switch_, check_bit_(data[282], 1));
     this->publish_state_(this->disable_temperature_sensors_switch_, check_bit_(data[282], 2));
     ESP_LOGI(TAG, "  GPS Heartbeat: %s", ONOFF(check_bit_(data[282], 4)));
-    ESP_LOGI(TAG, "  Port switch: %s", check_bit_(data[282], 8) ? "RS485" : "CAN");
+    ESP_LOGV(TAG, "  Port switch: %s", check_bit_(data[282], 8) ? LOG_STR_LITERAL("RS485") : LOG_STR_LITERAL("CAN"));
+    // The bit value doubles as the option index of the multiplexed_port_mode select (0: CAN, 1: RS485)
+    if (const char *name = multiplexed_port_mode_table_.get(check_bit_(data[282], 8) ? 1 : 0))
+      this->publish_state_(this->multiplexed_port_mode_select_, name);
     this->publish_state_(this->display_always_on_switch_, check_bit_(data[282], 16));
     ESP_LOGI(TAG, "  Special charger: %s", ONOFF(check_bit_(data[282], 32)));
     this->publish_state_(this->smart_sleep_switch_, check_bit_(data[282], 64));
     this->publish_state_(this->disable_pcl_module_switch_, check_bit_(data[282], 128));
     this->publish_state_(this->timed_stored_data_switch_, check_bit_(data[283], 1));
     this->publish_state_(this->charging_float_mode_switch_, check_bit_(data[283], 2));
+    this->publish_state_(this->emergency_button_trigger_switch_, check_bit_(data[283], 4));
+    this->publish_state_(this->dry_contact_alarm_intermittent_switch_, check_bit_(data[283], 8));
+    this->publish_state_(this->discharge_overcurrent_protection_2_switch_, check_bit_(data[283], 16));
+    this->publish_state_(this->discharge_overcurrent_protection_3_switch_, check_bit_(data[283], 32));
+    this->publish_state_(this->gps_locked_charging_switch_, check_bit_(data[283], 64));
+    this->publish_state_(this->gps_locked_discharging_switch_, check_bit_(data[283], 128));
 
     // 284   1   0x00                   Heating start temperature
     this->publish_state_(this->heating_start_temperature_number_, (float) ((int8_t) data[284]));
@@ -1174,8 +1428,8 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
     // 285   1   0x00                   Heating stop temperature
     this->publish_state_(this->heating_stop_temperature_number_, (float) ((int8_t) data[285]));
 
-    // 286   1   0x00
-    ESP_LOGI(TAG, "  Smart sleep: %d h", data[286]);
+    // 286   1   0x00                   Smart sleep delay
+    this->publish_state_(this->smart_sleep_delay_number_, (float) data[286]);
     // 287   1   0x00
     ESP_LOGI(TAG, "  Data field enable control 0: %d", data[287]);
     // 288   2   0x00 0x00
@@ -1204,7 +1458,7 @@ void JkBmsBle::decode_jk04_settings_(const std::vector<uint8_t> &data) {
     return (uint32_t(jk_get_16bit(i + 2)) << 16) | (uint32_t(jk_get_16bit(i + 0)) << 0);
   };
 
-  ESP_LOGI(TAG, "Settings frame (JK04, %d bytes) received", data.size());
+  ESP_LOGI(TAG, "Settings frame (JK04, %zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
 
@@ -1240,10 +1494,12 @@ void JkBmsBle::decode_jk04_settings_(const std::vector<uint8_t> &data) {
   // 26    4   0x00 0x00 0x00 0x00
   // 30    4   0x00 0x00 0x00 0x00
   // 34    4   0x10 0x00 0x00 0x00    Cell count
-  ESP_LOGI(TAG, "  Cell count: %d", data[34]);
+  ESP_LOGV(TAG, "  Cell count: %d", data[34]);
+  this->publish_state_(this->cell_count_number_, (float) data[34]);
 
   // 38    4   0x00 0x00 0x40 0x40    Power off voltage
-  ESP_LOGI(TAG, "  Power off voltage: %f V", (float) ieee_float_(jk_get_32bit(38)));
+  ESP_LOGV(TAG, "  Power off voltage: %f V", (float) ieee_float_(jk_get_32bit(38)));
+  this->publish_state_(this->power_off_voltage_number_, (float) ieee_float_(jk_get_32bit(38)));
 
   // 42    4   0x00 0x00 0x00 0x00
   // 46    4   0x00 0x00 0x00 0x00
@@ -1253,8 +1509,9 @@ void JkBmsBle::decode_jk04_settings_(const std::vector<uint8_t> &data) {
   // 62    4   0x00 0x00 0x00 0x00
   // 66    4   0x00 0x00 0x00 0x00
   // 70    4   0x00 0x00 0x00 0x00
-  // 74    4   0xA3 0xFD 0x40 0x40
-  ESP_LOGD(TAG, "  Unknown74: %f", (float) ieee_float_(jk_get_32bit(74)));
+  // 74    4   0xA3 0xFD 0x40 0x40    Voltage calibration (ADC Vref, reg 0x44)
+  ESP_LOGV(TAG, "  Voltage calibration (ADC Vref): %f", (float) ieee_float_(jk_get_32bit(74)));
+  this->publish_state_(this->voltage_calibration_number_, (float) ieee_float_(jk_get_32bit(74)));
 
   // 78    4   0x00 0x00 0x00 0x00
   // 82    4   0x00 0x00 0x00 0x00
@@ -1262,20 +1519,21 @@ void JkBmsBle::decode_jk04_settings_(const std::vector<uint8_t> &data) {
   // 90    4   0x00 0x00 0x00 0x00
   // 94    4   0x00 0x00 0x00 0x00
   // 98    4   0x00 0x00 0x88 0x40    Start balance voltage
-  ESP_LOGI(TAG, "  Start balance voltage: %f V", (float) ieee_float_(jk_get_32bit(98)));
+  ESP_LOGV(TAG, "  Start balance voltage: %f V", (float) ieee_float_(jk_get_32bit(98)));
+  this->publish_state_(this->balancing_start_voltage_number_, (float) ieee_float_(jk_get_32bit(98)));
 
   // 102   4   0x9A 0x99 0x59 0x40
   ESP_LOGD(TAG, "  Unknown102: %f", (float) ieee_float_(jk_get_32bit(102)));
 
   // 106   4   0x0A 0xD7 0xA3 0x3B    Trigger delta voltage
-  ESP_LOGI(TAG, "  Trigger Delta Voltage: %f V", (float) ieee_float_(jk_get_32bit(106)));
+  ESP_LOGV(TAG, "  Trigger Delta Voltage: %f V", (float) ieee_float_(jk_get_32bit(106)));
+  this->publish_state_(this->balance_trigger_voltage_number_, (float) ieee_float_(jk_get_32bit(106)));
 
   // 110   4   0x00 0x00 0x00 0x40    Max. balance current
-  ESP_LOGI(TAG, "  Max. balance current: %f A", (float) ieee_float_(jk_get_32bit(110)));
+  ESP_LOGV(TAG, "  Max. balance current: %f A", (float) ieee_float_(jk_get_32bit(110)));
+  this->publish_state_(this->max_balance_current_number_, (float) ieee_float_(jk_get_32bit(110)));
   // 114   4   0x01 0x00 0x00 0x00    Balancer switch
   this->publish_state_(this->balancer_switch_, (bool) (data[114]));
-
-  ESP_LOGI(TAG, "  ADC Vref: unknown V");  // 53.67 V?
 
   // 118  20   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
   // 138  20   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
@@ -1289,13 +1547,46 @@ void JkBmsBle::decode_jk04_settings_(const std::vector<uint8_t> &data) {
   // 298   2   0x00 0xCE
 }
 
+void JkBmsBle::decode_logbook_(const std::vector<uint8_t> &data) {
+  auto jk_get_32bit = [&](size_t i) -> uint32_t {
+    return (uint32_t(data[i + 3]) << 24) | (uint32_t(data[i + 2]) << 16) | (uint32_t(data[i + 1]) << 8) |
+           uint32_t(data[i]);
+  };
+
+  uint32_t log_count = jk_get_32bit(6);
+  ESP_LOGI(TAG, "Logbook frame (%zu bytes) received", data.size());
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
+  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
+  ESP_LOGI(TAG, "  Log count: %lu", (unsigned long) log_count);
+
+  for (uint32_t i = 0; i < log_count && i < 50; i++) {
+    uint32_t ts = jk_get_32bit(11 + i * 5);
+    uint8_t code = data[11 + i * 5 + 4];
+
+    uint32_t d = ts / 86400;
+    uint32_t rem = ts % 86400;
+    uint8_t h = rem / 3600;
+    uint8_t m = (rem % 3600) / 60;
+    uint8_t s = rem % 60;
+
+    const char *name = LOGBOOK_CODES[code];
+    if (name[0] != '\0') {
+      ESP_LOGI(TAG, "  [%lu] [%luD%02uH%02uM%02uS]: %s (0x%02X)", (unsigned long) (i + 1), (unsigned long) d, h, m, s,
+               name, code);
+    } else {
+      ESP_LOGI(TAG, "  [%lu] [%luD%02uH%02uM%02uS]: Unknown (0x%02X)", (unsigned long) (i + 1), (unsigned long) d, h, m,
+               s, code);
+    }
+  }
+}
+
 void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   auto jk_get_16bit = [&](size_t i) -> uint16_t { return (uint16_t(data[i + 1]) << 8) | (uint16_t(data[i + 0]) << 0); };
   auto jk_get_32bit = [&](size_t i) -> uint32_t {
     return (uint32_t(jk_get_16bit(i + 2)) << 16) | (uint32_t(jk_get_16bit(i + 0)) << 0);
   };
 
-  ESP_LOGI(TAG, "Device info frame (%d bytes) received", data.size());
+  ESP_LOGI(TAG, "Device info frame (%zu bytes) received", data.size());
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
   ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
 
@@ -1368,8 +1659,10 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   // 0     4   0x55 0xAA 0xEB 0x90    Header
   // 4     1   0x03                   Frame type
   // 5     1   0xC9                   Frame counter
-  // 6    16   0x4A 0x4B 0x5F 0x50 0x42 0x32 0x41 0x31 0x36 0x53 0x31 0x35 0x50 0x00 0x00 0x00
-  ESP_LOGI(TAG, "  Vendor ID: %s", std::string(data.begin() + 6, data.begin() + 6 + 16).c_str());
+  // 6    16   0x4A 0x4B 0x5F 0x50 0x42 0x32 0x41 0x31 0x36 0x53 0x31 0x35 0x50 0x00 0x00 0x00    Vendor ID / model
+  auto device_model_begin = data.begin() + 6;
+  this->publish_state_(this->device_model_text_sensor_,
+                       std::string(device_model_begin, std::find(device_model_begin, device_model_begin + 16, '\0')));
 
   // 22    8   0x31 0x34 0x2E 0x58 0x41 0x00 0x00 0x00    Hardware version
   auto hardware_version_begin = data.begin() + 22;
@@ -1386,8 +1679,8 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   // 38    4   0x54 0xE6 0x01 0x00
   ESP_LOGI(TAG, "  Uptime: %lu s", (unsigned long) jk_get_32bit(38));
 
-  // 42    4   0x9C 0x00 0x00 0x00
-  ESP_LOGI(TAG, "  Power on count: %lu", (unsigned long) jk_get_32bit(42));
+  // 42    4   0x9C 0x00 0x00 0x00    Power on count
+  this->publish_state_(this->power_on_count_sensor_, (float) jk_get_32bit(42));
 
   // 46   16   0x4A 0x4B 0x5F 0x50 0x42 0x32 0x41 0x31 0x36 0x53 0x31 0x35 0x50 0x00 0x00 0x00
   ESP_LOGI(TAG, "  Device name: %s", std::string(data.begin() + 46, data.begin() + 46 + 16).c_str());
@@ -1395,11 +1688,17 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   // 62   16   0x31 0x32 0x33 0x34 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
   ESP_LOGI(TAG, "  Device passcode: %s", std::string(data.begin() + 62, data.begin() + 62 + 16).c_str());
 
-  // 78    8   0x32 0x33 0x31 0x31 0x31 0x38 0x00 0x00
-  ESP_LOGI(TAG, "  Manufacturing date: %s", std::string(data.begin() + 78, data.begin() + 78 + 8).c_str());
+  // 78    6   0x32 0x33 0x31 0x31 0x31 0x38    Manufacturing date (YYMMDD), empty on JK04
+  auto manufacturing_date_begin = data.begin() + 78;
+  this->publish_state_(
+      this->manufacturing_date_text_sensor_,
+      data[78] == '\0' ? "" : "20" + std::string(manufacturing_date_begin, manufacturing_date_begin + 6));
 
-  // 86    8   0x33 0x30 0x39 0x32 0x35 0x37 0x32 0x31 0x33 0x34 0x00
-  ESP_LOGI(TAG, "  Serial number: %s", std::string(data.begin() + 86, data.begin() + 86 + 11).c_str());
+  // 86    8   0x33 0x30 0x39 0x32 0x35 0x37 0x32 0x31 0x33 0x34 0x00    Serial number
+  auto serial_number_begin = data.begin() + 86;
+  this->publish_state_(
+      this->serial_number_text_sensor_,
+      std::string(serial_number_begin, std::find(serial_number_begin, serial_number_begin + 11, '\0')));
 
   // 97    5   0x30 0x30 0x30 0x30 0x00
   ESP_LOGI(TAG, "  Passcode: %s", std::string(data.begin() + 97, data.begin() + 97 + 5).c_str());
@@ -1464,29 +1763,17 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   // 182  0x00
   // 183  0x00
   // 184  0x01                  UART1M Protocol number
-  ESP_LOGI(TAG, "  UART1 Protocol: %d", data[184]);
-  // 185  0x04                  CANM Protocol number
-  ESP_LOGI(TAG, "  CAN Protocol: %d", data[185]);
-  // 186  0xCF
-  // 187  0x03
-  // 188  0x00
-  // 189  0x00
-  // 190  0x00
-  // 191  0x00
-  // 192  0x00
-  // 193  0x00
-  // 194  0x00
-  // 195  0x00
-  // 196  0x00
-  // 197  0x00
-  // 198  0x00
-  // 199  0x00
-  // 200  0x00
-  // 201  0x00
-  // 202  0xDF
-  // 203  0x07
-  // 204  0x00
-  // 205  0x00
+  if (const char *name = uart_protocol_table_.get(data[184]))
+    this->publish_state_(this->uart1_protocol_select_, name);
+  // 185  0x04                  CAN Protocol number
+  if (const char *name = can_protocol_table_.get(data[185]))
+    this->publish_state_(this->can_protocol_select_, name);
+  // 186  4    0xCF 0x03 0x00 0x00   UART1M Protocol enable
+  this->publish_state_(this->uart1_protocols_enabled_bitmask_sensor_, (float) jk_get_32bit(186));
+  // 190  12   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+  ESP_LOGI(TAG, "  Hardware option: %s", std::string(data.begin() + 190, data.begin() + 190 + 12).c_str());
+  // 202  4    0xDF 0x07 0x00 0x00   CANM Protocol enable
+  this->publish_state_(this->can_protocols_enabled_bitmask_sensor_, (float) jk_get_32bit(202));
   // 206  0x00
   // 207  0x00
   // 208  0x00
@@ -1500,11 +1787,10 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   // 216  0x00
   // 217  0x00
   // 218  0x01                  UART2M Protocol number
-  ESP_LOGI(TAG, "  UART2 Protocol: %d", data[218]);
-  // 219  0xCF                  UART2M Protocol enable
-  // 220  0x03
-  // 221  0x00
-  // 222  0x00
+  if (const char *name = uart_protocol_table_.get(data[218]))
+    this->publish_state_(this->uart2_protocol_select_, name);
+  // 219  4    0xCF 0x03 0x00 0x00   UART2M Protocol enable
+  this->publish_state_(this->uart2_protocols_enabled_bitmask_sensor_, (float) jk_get_32bit(219));
   // 223  0x00
   // 224  0x00
   // 225  0x00
@@ -1517,8 +1803,14 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   // 232  0x00
   // 233  0x00
   // 234  0x00                  LCD buzzer trigger
+  if (const char *name = lcd_buzzer_trigger_table_.get(data[234]))
+    this->publish_state_(this->lcd_buzzer_trigger_select_, name);
   // 235  0x0B                  DRY1 Trigger
+  if (const char *name = lcd_buzzer_trigger_table_.get(data[235]))
+    this->publish_state_(this->dry1_trigger_select_, name);
   // 236  0x00                  DRY2 Trigger
+  if (const char *name = lcd_buzzer_trigger_table_.get(data[236]))
+    this->publish_state_(this->dry2_trigger_select_, name);
   // 237  0x01                  UART protocol library version
   // 238  0x00 0x00 0x00 0x00   LCD Buzzer Trigger Value
   // 242  0x00 0x00 0x00 0x00   LCD Buzzer Release Value
@@ -1538,14 +1830,15 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
 
   // 268  0x01  CAN protocol library version
   // 269  0x00  Reserved
-  // 270  0x00
-  // 271  0x00
-  // 272  0x00
-  // 273  0x00
-  // 274  0x00
-  // 275  0x00
-  // 276  0x00
-  // 277  0x00
+  // 270  0x00                  UART3 Protocol number
+  if (const char *name = uart_protocol_table_.get(data[270]))
+    this->publish_state_(this->uart3_protocol_select_, name);
+  // 271  4    0x00 0x00 0x00 0x00   UART3 Protocol enable (lower 32 of 56 bits)
+  this->publish_state_(this->uart3_protocols_enabled_bitmask_sensor_, (float) jk_get_32bit(271));
+  // 275  3    0x00 0x00 0x00       UART3 Protocol enable (upper 24 bits, reserved)
+  // 269  0x00                  Emergency duration  min
+  this->publish_state_(this->emergency_duration_number_, (float) data[269]);
+
   // 278  0x00  Re-Bulk SOC  %
   ESP_LOGI(TAG, "  Re-Bulk SOC: %d %%", data[278]);
   this->publish_state_(this->re_bulk_soc_number_, (float) data[278]);
@@ -1602,17 +1895,16 @@ void JkBmsBle::publish_device_unavailable_() {
   this->publish_state_(power_sensor_, NAN);
   this->publish_state_(charging_power_sensor_, NAN);
   this->publish_state_(discharging_power_sensor_, NAN);
-  this->publish_state_(power_tube_temperature_sensor_, NAN);
-  this->publish_state_(balancing_sensor_, NAN);
+  this->publish_state_(mosfet_temperature_sensor_, NAN);
+  this->publish_state_(balancer_status_bitmask_sensor_, NAN);
   this->publish_state_(state_of_charge_sensor_, NAN);
   this->publish_state_(state_of_health_sensor_, NAN);
   this->publish_state_(capacity_remaining_sensor_, NAN);
-  this->publish_state_(total_battery_capacity_setting_sensor_, NAN);
+  this->publish_state_(full_charge_capacity_sensor_, NAN);
   this->publish_state_(charging_cycles_sensor_, NAN);
   this->publish_state_(total_charging_cycle_capacity_sensor_, NAN);
   this->publish_state_(total_runtime_sensor_, NAN);
   this->publish_state_(balancing_current_sensor_, NAN);
-  this->publish_state_(errors_bitmask_sensor_, NAN);
   this->publish_state_(heating_current_sensor_, NAN);
 
   for (auto &cell : this->cells_) {
@@ -1652,6 +1944,13 @@ void JkBmsBle::publish_state_(switch_::Switch *obj, const bool &state) {
   obj->publish_state(state);
 }
 
+void JkBmsBle::publish_state_(select::Select *obj, const std::string &state) {
+  if (obj == nullptr)
+    return;
+
+  obj->publish_state(state);
+}
+
 void JkBmsBle::publish_state_(text_sensor::TextSensor *text_sensor, const std::string &state) {
   if (text_sensor == nullptr)
     return;
@@ -1659,21 +1958,28 @@ void JkBmsBle::publish_state_(text_sensor::TextSensor *text_sensor, const std::s
   text_sensor->publish_state(state);
 }
 
-std::string JkBmsBle::error_bits_to_string_(const uint16_t mask) {
-  bool first = true;
-  std::string errors_list = "";
+std::string JkBmsBle::to_hex_string_(const uint32_t mask) {
+  char buf[11];
+  snprintf(buf, sizeof(buf), "0x%08" PRIX32, mask);
+  return std::string(buf);
+}
 
-  if (mask) {
-    for (int i = 0; i < ERRORS_SIZE; i++) {
-      if (mask & (1 << i)) {
-        if (first) {
-          first = false;
-        } else {
-          errors_list.append(";");
-        }
-        errors_list.append(ERRORS[i]);
-      }
-    }
+std::string JkBmsBle::error_bits_to_string_(const uint32_t mask, const LookupTable &errors, const uint8_t bits) {
+  std::string errors_list;
+
+  for (uint8_t i = 0; i < bits; i++) {
+    if ((mask & (1UL << i)) == 0)
+      continue;
+
+    // Bits without a label (unused or suppressed via `error_overrides`) and bits beyond
+    // the configured table are reported by the raw bitmask sensor only.
+    const char *label = errors.get(i);
+    if (label == nullptr || label[0] == '\0')
+      continue;
+
+    if (!errors_list.empty())
+      errors_list.append(";");
+    errors_list.append(label);
   }
 
   return errors_list;
@@ -1683,6 +1989,19 @@ static std::string unknown_to_string(const uint8_t value) {
   char buf[15];
   snprintf(buf, sizeof(buf), "Unknown (0x%02X)", value);
   return buf;
+}
+
+std::string JkBmsBle::battery_type_id_to_string_(const uint8_t code) {
+  switch (code) {
+    case 0x00:
+      return "LFP";
+    case 0x01:
+      return "Li-ion";
+    case 0x02:
+      return "LTO";
+    default:
+      return unknown_to_string(code);
+  }
 }
 
 std::string JkBmsBle::charge_status_id_to_string_(const uint8_t status) {

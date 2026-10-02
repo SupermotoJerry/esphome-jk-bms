@@ -9,13 +9,15 @@ on:  # yamllint disable-line rule:truthy
   schedule:
     - cron: 0 12 * * *
 
+  workflow_dispatch:
+
 permissions:
   contents: read
 
 env:
   FORCE_COLOR: 1
-  DEFAULT_PYTHON: "3.11"
-  PYUPGRADE_TARGET: "--py311-plus"
+  DEFAULT_PYTHON: "3.12"
+  PYUPGRADE_TARGET: "--py312-plus"
 
 concurrency:
   # yamllint disable-line rule:line-length
@@ -368,13 +370,6 @@ jobs:
           echo "::add-matcher::.github/workflows/matchers/gcc.json"
           echo "::add-matcher::.github/workflows/matchers/clang-tidy.json"
 
-      - name: Run 'pio run --list-targets -e esp32-idf-tidy'
-        if: matrix.name == 'Run script/clang-tidy for ESP32 IDF'
-        run: |
-          . venv/bin/activate
-          mkdir -p .temp
-          pio run --list-targets -e esp32-idf-tidy
-
       - name: Install clang-tidy
         run: |
           . venv/bin/activate
@@ -491,7 +486,7 @@ jobs:
       - name: Validate example configurations
         run: |
           . venv/bin/activate
-          echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password" > secrets.yaml
+          echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password\nbms0_mac_address: 70:3e:97:07:c0:3e\nbms1_mac_address: 70:3e:97:07:c0:3f\nbalancer0_mac_address: 70:3e:97:07:c0:40\nbalancer1_mac_address: 70:3e:97:07:c0:41" > secrets.yaml
           for YAML in esp*.yaml; do
             esphome -s external_components_source components config $YAML
           done
@@ -499,7 +494,7 @@ jobs:
       - name: Validate YAML snippets
         run: |
           . venv/bin/activate
-          echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password" > yaml-snippets/secrets.yaml
+          echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password\nbms0_mac_address: 70:3e:97:07:c0:3e\nbms1_mac_address: 70:3e:97:07:c0:3f\nbalancer0_mac_address: 70:3e:97:07:c0:40\nbalancer1_mac_address: 70:3e:97:07:c0:41" > yaml-snippets/secrets.yaml
           for YAML in yaml-snippets/esp*.yaml; do
             esphome -s external_components_source ../components config $YAML
           done
@@ -507,7 +502,7 @@ jobs:
       - name: Validate test configurations
         run: |
           . venv/bin/activate
-          echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password" > tests/secrets.yaml
+          echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password\nbms0_mac_address: 70:3e:97:07:c0:3e\nbms1_mac_address: 70:3e:97:07:c0:3f\nbalancer0_mac_address: 70:3e:97:07:c0:40\nbalancer1_mac_address: 70:3e:97:07:c0:41" > tests/secrets.yaml
           for YAML in tests/esp*.yaml; do
             esphome -s external_components_source ../components config $YAML
           done
@@ -533,7 +528,7 @@ jobs:
 
       - name: Write secrets.yaml
         shell: bash
-        run: 'echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password" > secrets.yaml'
+        run: 'echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password\nbms0_mac_address: 70:3e:97:07:c0:3e\nbms1_mac_address: 70:3e:97:07:c0:3f\nbalancer0_mac_address: 70:3e:97:07:c0:40\nbalancer1_mac_address: 70:3e:97:07:c0:41" > secrets.yaml'
 
       - name: Cache platformio
         if: github.ref == 'refs/heads/main'
@@ -555,6 +550,7 @@ jobs:
         run: |
           . venv/bin/activate
           esphome -s external_components_source components compile esp32-heltec-balancer-ble-example-faker.yaml
+          esphome -s external_components_source components compile esp32-heltec-balancer-ble-ek-b24s8e200a-example-faker.yaml
           # esphome -s external_components_source components compile esp32-heltec-balancer-ble-example-multiple-devices.yaml
         env:
           PLATFORMIO_LIBDEPS_DIR: ~/.platformio/libdeps
@@ -607,7 +603,7 @@ jobs:
 
       - name: Write tests/secrets.yaml
         shell: bash
-        run: 'echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password" > tests/secrets.yaml'
+        run: 'echo -e "wifi_ssid: ssid\nwifi_password: password\nmqtt_host: host\nmqtt_username: username\nmqtt_password: password\nbms0_mac_address: 70:3e:97:07:c0:3e\nbms1_mac_address: 70:3e:97:07:c0:3f\nbalancer0_mac_address: 70:3e:97:07:c0:40\nbalancer1_mac_address: 70:3e:97:07:c0:41" > tests/secrets.yaml'
 
       - name: Compile test configurations
         run: |

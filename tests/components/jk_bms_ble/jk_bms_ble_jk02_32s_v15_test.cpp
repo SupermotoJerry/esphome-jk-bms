@@ -20,6 +20,14 @@ TEST(JkBmsV15DeviceInfoTest, SoftwareVersion) {
   EXPECT_EQ(sw.state, "15.38");
 }
 
+TEST(JkBmsV15DeviceInfoTest, PowerOnCount) {
+  TestableJkBmsBle bms;
+  sensor::Sensor power_on_count;
+  bms.set_power_on_count_sensor(&power_on_count);
+  bms.decode_device_info_(DEVICE_INFO_JK02_32S_V15);
+  EXPECT_EQ(power_on_count.state, 29.0f);
+}
+
 TEST(JkBmsV15CellInfoTest, CellVoltages) {
   TestableJkBmsBle bms;
   bms.set_protocol_version(PROTOCOL_VERSION_JK02_32S);
@@ -73,7 +81,7 @@ TEST(JkBmsV15CellInfoTest, Temperatures) {
   sensor::Sensor t1, t2, tube;
   bms.set_temperature_sensor(0, &t1);
   bms.set_temperature_sensor(1, &t2);
-  bms.set_power_tube_temperature_sensor(&tube);
+  bms.set_mosfet_temperature_sensor(&tube);
   bms.decode_jk02_cell_info_(CELL_INFO_JK02_32S_V15);
   EXPECT_NEAR(t1.state, 13.4f, 0.1f);
   EXPECT_NEAR(t2.state, 12.8f, 0.1f);
@@ -94,7 +102,7 @@ TEST(JkBmsV15CellInfoTest, Capacity) {
   bms.set_protocol_version(PROTOCOL_VERSION_JK02_32S);
   sensor::Sensor remaining, nominal;
   bms.set_capacity_remaining_sensor(&remaining);
-  bms.set_total_battery_capacity_setting_sensor(&nominal);
+  bms.set_full_charge_capacity_sensor(&nominal);
   bms.decode_jk02_cell_info_(CELL_INFO_JK02_32S_V15);
   EXPECT_NEAR(remaining.state, 49.286f, 0.001f);
   EXPECT_NEAR(nominal.state, 200.000f, 0.001f);

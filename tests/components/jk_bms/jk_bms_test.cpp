@@ -80,32 +80,48 @@ TEST(JkBmsStatusDataTest, ChargingCurrentAndPower) {
 
 TEST(JkBmsStatusDataTest, Temperatures) {
   TestableJkBms bms;
-  sensor::Sensor tube, t1, t2;
-  bms.set_power_tube_temperature_sensor(&tube);
+  sensor::Sensor tube, t1, t2, count;
+  bms.set_mosfet_temperature_sensor(&tube);
   bms.set_temperature_sensor_1_sensor(&t1);
   bms.set_temperature_sensor_2_sensor(&t2);
+  bms.set_temperature_sensor_count_sensor(&count);
 
   bms.on_jk_modbus_data(FUNCTION_READ_ALL, STATUS_FRAME_14S);
 
   EXPECT_FLOAT_EQ(tube.state, 29.0f);
   EXPECT_FLOAT_EQ(t1.state, 30.0f);
   EXPECT_FLOAT_EQ(t2.state, 28.0f);
+  EXPECT_FLOAT_EQ(count.state, 2.0f);
 }
 
 // ── Capacity ─────────────────────────────────────────────────────────────────
 
 TEST(JkBmsStatusDataTest, Capacity) {
   TestableJkBms bms;
-  sensor::Sensor remaining, remaining_derived, nominal;
-  bms.set_capacity_remaining_sensor(&remaining);
-  bms.set_capacity_remaining_derived_sensor(&remaining_derived);
-  bms.set_total_battery_capacity_setting_sensor(&nominal);
+  sensor::Sensor soc, capacity_remaining, full_charge_capacity;
+  bms.set_state_of_charge_sensor(&soc);
+  bms.set_capacity_remaining_sensor(&capacity_remaining);
+  bms.set_full_charge_capacity_sensor(&full_charge_capacity);
 
   bms.on_jk_modbus_data(FUNCTION_READ_ALL, STATUS_FRAME_14S);
 
-  EXPECT_FLOAT_EQ(remaining.state, 15.0f);             // 15 %
-  EXPECT_NEAR(remaining_derived.state, 2.1f, 0.001f);  // 14 Ah × 15 %
-  EXPECT_FLOAT_EQ(nominal.state, 14.0f);               // 14 Ah
+  EXPECT_FLOAT_EQ(soc.state, 15.0f);                    // 15 %
+  EXPECT_NEAR(capacity_remaining.state, 2.1f, 0.001f);  // 14 Ah × 15 %
+  EXPECT_FLOAT_EQ(full_charge_capacity.state, 14.0f);   // 14 Ah
+}
+
+// ── Balancing configuration ──────────────────────────────────────────────────
+
+TEST(JkBmsStatusDataTest, BalancingConfig) {
+  TestableJkBms bms;
+  sensor::Sensor starting_voltage, delta_voltage;
+  bms.set_balancing_start_voltage_sensor(&starting_voltage);
+  bms.set_balancing_delta_voltage_sensor(&delta_voltage);
+
+  bms.on_jk_modbus_data(FUNCTION_READ_ALL, STATUS_FRAME_14S);
+
+  EXPECT_NEAR(starting_voltage.state, 3.300f, 0.001f);  // 3300 × 0.001
+  EXPECT_NEAR(delta_voltage.state, 0.008f, 0.001f);     // 8 × 0.001
 }
 
 // ── Errors ───────────────────────────────────────────────────────────────────
@@ -146,9 +162,10 @@ TEST(JkBmsStatusDataTest, OperationModes) {
 
 TEST(JkBmsStatusDataTest, SwitchStates) {
   TestableJkBms bms;
-  binary_sensor::BinarySensor charging_sw, discharging_sw, balancing_sw;
-  bms.set_charging_switch_binary_sensor(&charging_sw);
-  bms.set_discharging_switch_binary_sensor(&discharging_sw);
+  TestSwitch charging_sw, discharging_sw;
+  binary_sensor::BinarySensor balancing_sw;
+  bms.set_charging_switch(&charging_sw);
+  bms.set_discharging_switch(&discharging_sw);
   bms.set_balancing_switch_binary_sensor(&balancing_sw);
 
   bms.on_jk_modbus_data(FUNCTION_READ_ALL, STATUS_FRAME_14S);
@@ -162,17 +179,29 @@ TEST(JkBmsStatusDataTest, SwitchStates) {
 
 TEST(JkBmsStatusDataTest, BatteryInfo) {
   TestableJkBms bms;
-  sensor::Sensor strings, cycles;
+  sensor::Sensor cell_count, cycles;
   text_sensor::TextSensor battery_type;
-  bms.set_battery_strings_sensor(&strings);
+  bms.set_cell_count_sensor(&cell_count);
   bms.set_charging_cycles_sensor(&cycles);
   bms.set_battery_type_text_sensor(&battery_type);
 
   bms.on_jk_modbus_data(FUNCTION_READ_ALL, STATUS_FRAME_14S);
 
-  EXPECT_FLOAT_EQ(strings.state, 14.0f);
+  EXPECT_FLOAT_EQ(cell_count.state, 14.0f);
   EXPECT_FLOAT_EQ(cycles.state, 4.0f);
   EXPECT_EQ(battery_type.state, "Ternary Lithium");
+}
+
+// ── Alarm thresholds ─────────────────────────────────────────────────────────
+
+TEST(JkBmsStatusDataTest, LowSocAlarm) {
+  TestableJkBms bms;
+  sensor::Sensor low_soc_alarm_threshold;
+  bms.set_low_soc_alarm_threshold_sensor(&low_soc_alarm_threshold);
+
+  bms.on_jk_modbus_data(FUNCTION_READ_ALL, STATUS_FRAME_14S);
+
+  EXPECT_FLOAT_EQ(low_soc_alarm_threshold.state, 20.0f);  // 0x14 = 20 %
 }
 
 // ── Version and runtime ──────────────────────────────────────────────────────
