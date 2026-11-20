@@ -1,9 +1,10 @@
 """Schema structure tests for jk_bms ESPHome component modules."""
 
-import os
+from pathlib import Path
+import re
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest  # noqa: E402
 import voluptuous as vol  # noqa: E402
@@ -142,6 +143,17 @@ class TestJkBmsErrorOverrides:
         with pytest.raises(vol.Invalid, match="Error bit -1 is out of range"):
             self._validate({"-1": "Nope"})
 
+    @pytest.mark.parametrize("alias", ["01", "0x1", " 1", "+1"])
+    def test_schema_rejects_non_decimal_bit_spelling(self, alias):
+        with pytest.raises(
+            vol.Invalid, match=f"Write error bit '{re.escape(alias)}' as 1"
+        ):
+            self._validate({"1": "a", alias: "b"})
+
+    def test_schema_rejects_aliased_suppressed_bit(self):
+        with pytest.raises(vol.Invalid, match="Write error bit '0x1' as 1"):
+            self._validate({"1": "", "0x1": ""})
+
     def test_schema_rejects_non_numeric_bit(self):
         with pytest.raises(vol.Invalid, match="'abc' is not a valid error bit"):
             self._validate({"abc": "Nope"})
@@ -175,7 +187,8 @@ class TestJkBmsBleSensorLists:
         assert "detail_log_entry_count" in ble_sensor.SENSOR_DEFS
         assert "battery_type_id" in ble_sensor.SENSOR_DEFS
         assert ble_sensor.CONF_POWER_ON_COUNT in ble_sensor.SENSOR_DEFS
-        assert len(ble_sensor.SENSOR_DEFS) == 33
+        assert ble_sensor.CONF_DEVICE_ADDRESS in ble_sensor.SENSOR_DEFS
+        assert len(ble_sensor.SENSOR_DEFS) == 34
 
 
 class TestJkBmsBleErrorOverrides:
@@ -217,14 +230,28 @@ class TestJkBmsBleErrorOverrides:
     def test_schema_accepts_empty_label(self):
         assert self._validate({"4": ""}) == {4: ""}
 
-    def test_schema_accepts_hex_bit_index(self):
-        assert self._validate({"0x1F": "Reserved"}) == {31: "Reserved"}
+    def test_schema_rejects_quoted_hex_bit_index(self):
+        # Unquoted 0x1F arrives as "31" from the YAML loader; only the quoted
+        # spelling reaches the validator and would alias bit 31.
+        with pytest.raises(vol.Invalid, match="Write error bit '0x1F' as 31"):
+            self._validate({"0x1F": "Reserved"})
 
     def test_schema_rejects_out_of_range_bit(self):
         with pytest.raises(vol.Invalid, match="Error bit 32 is out of range"):
             self._validate({"32": "Nope"})
         with pytest.raises(vol.Invalid, match="Error bit -1 is out of range"):
             self._validate({"-1": "Nope"})
+
+    @pytest.mark.parametrize("alias", ["01", "0x1", " 1", "+1"])
+    def test_schema_rejects_non_decimal_bit_spelling(self, alias):
+        with pytest.raises(
+            vol.Invalid, match=f"Write error bit '{re.escape(alias)}' as 1"
+        ):
+            self._validate({"1": "a", alias: "b"})
+
+    def test_schema_rejects_aliased_suppressed_bit(self):
+        with pytest.raises(vol.Invalid, match="Write error bit '0x1' as 1"):
+            self._validate({"1": "", "0x1": ""})
 
     def test_schema_rejects_non_numeric_bit(self):
         with pytest.raises(vol.Invalid, match="'abc' is not a valid error bit"):
@@ -365,9 +392,10 @@ class TestJkBleTextSensorConstants:
         assert ble_text_sensor.CONF_CHARGE_STATUS in ble_text_sensor.TEXT_SENSORS
         assert ble_text_sensor.CONF_BATTERY_TYPE in ble_text_sensor.TEXT_SENSORS
         assert ble_text_sensor.CONF_DEVICE_MODEL in ble_text_sensor.TEXT_SENSORS
+        assert ble_text_sensor.CONF_DEVICE_NAME in ble_text_sensor.TEXT_SENSORS
         assert ble_text_sensor.CONF_MANUFACTURING_DATE in ble_text_sensor.TEXT_SENSORS
         assert ble_text_sensor.CONF_SERIAL_NUMBER in ble_text_sensor.TEXT_SENSORS
-        assert len(ble_text_sensor.TEXT_SENSORS) == 11
+        assert len(ble_text_sensor.TEXT_SENSORS) == 12
 
 
 class TestJkBmsDisplaySensorLists:
@@ -386,7 +414,7 @@ class TestJkBalancerSensorLists:
         assert len(jk_balancer_sensor.CELLS) == 24
 
     def test_sensor_defs_completeness(self):
-        assert len(jk_balancer_sensor.SENSOR_DEFS) == 14
+        assert len(jk_balancer_sensor.SENSOR_DEFS) == 12
 
     def test_binary_sensor_defs_dict(self):
         assert len(jk_balancer_binary_sensor.BINARY_SENSOR_DEFS) == 2
@@ -443,6 +471,17 @@ class TestJkBalancerErrorOverrides:
         with pytest.raises(vol.Invalid, match="Error bit -1 is out of range"):
             self._validate({"-1": "Nope"})
 
+    @pytest.mark.parametrize("alias", ["01", "0x1", " 1", "+1"])
+    def test_schema_rejects_non_decimal_bit_spelling(self, alias):
+        with pytest.raises(
+            vol.Invalid, match=f"Write error bit '{re.escape(alias)}' as 1"
+        ):
+            self._validate({"1": "a", alias: "b"})
+
+    def test_schema_rejects_aliased_suppressed_bit(self):
+        with pytest.raises(vol.Invalid, match="Write error bit '0x1' as 1"):
+            self._validate({"1": "", "0x1": ""})
+
     def test_schema_rejects_non_numeric_bit(self):
         with pytest.raises(vol.Invalid, match="'abc' is not a valid error bit"):
             self._validate({"abc": "Nope"})
@@ -462,7 +501,7 @@ class TestHeltecBalancerBleSensorLists:
     def test_sensor_defs_completeness(self):
         assert heltec_sensor.CONF_TOTAL_RUNTIME in heltec_sensor.SENSOR_DEFS
         assert heltec_sensor.CONF_POWER_ON_COUNT in heltec_sensor.SENSOR_DEFS
-        assert len(heltec_sensor.SENSOR_DEFS) == 24
+        assert len(heltec_sensor.SENSOR_DEFS) == 23
 
     def test_binary_sensor_defs_dict(self):
         assert (

@@ -4,6 +4,7 @@ import esphome.config_validation as cv
 from esphome.const import CONF_ID
 
 CODEOWNERS = ["@syssi"]
+DOMAIN = "jk_bms_display"
 
 DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["binary_sensor", "sensor"]
@@ -14,14 +15,8 @@ CONF_JK_BMS_DISPLAY_ID = "jk_bms_display_id"
 jk_bms_display_ns = cg.esphome_ns.namespace("jk_bms_display")
 JkBmsDisplay = jk_bms_display_ns.class_("JkBmsDisplay", cg.Component, uart.UARTDevice)
 
-CONF_JK_BMS_DISPLAY_COMPONENT_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(CONF_JK_BMS_DISPLAY_ID): cv.use_id(JkBmsDisplay),
-    }
-)
-
 CONFIG_SCHEMA = cv.All(
-    cv.require_esphome_version(2024, 12, 0),
+    cv.require_esphome_version(2026, 1, 0),
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(JkBmsDisplay),
@@ -36,7 +31,7 @@ JK_BMS_DISPLAY_COMPONENT_SCHEMA = cv.Schema(
 )
 
 FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
-    "jk_bms_display",
+    DOMAIN,
     baud_rate=2400,
     data_bits=8,
     parity="NONE",

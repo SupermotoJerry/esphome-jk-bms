@@ -1,17 +1,26 @@
 #include "jk_bms_ble.h"
 #include "esphome/core/log.h"
-#include "esphome/core/version.h"
+#include "esphome/core/helpers.h"
 #include <cinttypes>
 
-#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 12, 0)
-#define ADDR_STR(x) x
-#else
-#define ADDR_STR(x) (x).c_str()
+// Fallback for ESPHome < 2026.10.0
+#ifndef ESPHOME_LOG_TAG
+#define ESPHOME_LOG_TAG(name, tag) static const char *const name = tag
 #endif
 
 namespace esphome::jk_bms_ble {
 
-static constexpr const char *const TAG = "jk_bms_ble";
+ESPHOME_LOG_TAG(TAG, "jk_bms_ble");
+
+static constexpr size_t MAX_HEX_DUMP_BYTES = 100;
+
+static void log_hex_chunked(const char *tag, const uint8_t *data, size_t size) {
+  char buf[format_hex_pretty_size(100)];
+  for (size_t i = 0; i < size; i += 100) {
+    size_t len = std::min<size_t>(100, size - i);
+    ESP_LOGVV(tag, "  %s", format_hex_pretty_to(buf, sizeof(buf), data + i, len, '.'));
+  }
+}
 
 static const uint8_t MAX_NO_RESPONSE_COUNT = 10;
 
@@ -404,6 +413,7 @@ void JkBmsBle::dump_config() {  // NOLINT(google-readability-function-size,reada
   LOG_SENSOR("", "Charge Status ID", this->charge_status_id_sensor_);
   LOG_SENSOR("", "Charge Status Time Elapsed", this->charge_status_time_elapsed_sensor_);
   LOG_SENSOR("", "Battery Type ID", this->battery_type_id_sensor_);
+  LOG_SENSOR("", "Device Address", this->device_address_sensor_);
 
   LOG_TEXT_SENSOR("", "Balancer Status", this->balancer_status_text_sensor_);
   LOG_TEXT_SENSOR("", "Total Runtime Formatted", this->total_runtime_formatted_text_sensor_);
@@ -414,8 +424,27 @@ void JkBmsBle::dump_config() {  // NOLINT(google-readability-function-size,reada
   LOG_TEXT_SENSOR("", "Hardware Version", this->hardware_version_text_sensor_);
   LOG_TEXT_SENSOR("", "Battery Type", this->battery_type_text_sensor_);
   LOG_TEXT_SENSOR("", "Device Model", this->device_model_text_sensor_);
+  LOG_TEXT_SENSOR("", "Device Name", this->device_name_text_sensor_);
   LOG_TEXT_SENSOR("", "Manufacturing Date", this->manufacturing_date_text_sensor_);
   LOG_TEXT_SENSOR("", "Serial Number", this->serial_number_text_sensor_);
+
+  LOG_SWITCH("", "Charging", this->charging_switch_);
+  LOG_SWITCH("", "Discharging", this->discharging_switch_);
+  LOG_SWITCH("", "Balancer", this->balancer_switch_);
+  LOG_SWITCH("", "Emergency", this->emergency_switch_);
+  LOG_SWITCH("", "Heating", this->heating_switch_);
+  LOG_SWITCH("", "Disable temperature sensors", this->disable_temperature_sensors_switch_);
+  LOG_SWITCH("", "Display always on", this->display_always_on_switch_);
+  LOG_SWITCH("", "Smart sleep", this->smart_sleep_switch_);
+  LOG_SWITCH("", "Timed stored data", this->timed_stored_data_switch_);
+  LOG_SWITCH("", "Disable PCL module", this->disable_pcl_module_switch_);
+  LOG_SWITCH("", "Charging float mode", this->charging_float_mode_switch_);
+  LOG_SWITCH("", "Emergency button trigger", this->emergency_button_trigger_switch_);
+  LOG_SWITCH("", "Dry contact alarm intermittent", this->dry_contact_alarm_intermittent_switch_);
+  LOG_SWITCH("", "Discharge overcurrent protection 2", this->discharge_overcurrent_protection_2_switch_);
+  LOG_SWITCH("", "Discharge overcurrent protection 3", this->discharge_overcurrent_protection_3_switch_);
+  LOG_SWITCH("", "GPS locked charging", this->gps_locked_charging_switch_);
+  LOG_SWITCH("", "GPS locked discharging", this->gps_locked_discharging_switch_);
 }
 
 #ifdef USE_ESP32
@@ -446,8 +475,7 @@ void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
     case ESP_GATTC_SEARCH_CMPL_EVT: {
       auto *chr = this->parent_->get_characteristic(JK_BMS_SERVICE_UUID, JK_BMS_CHARACTERISTIC_UUID);
       if (chr == nullptr) {
-        ESP_LOGE(TAG, "[%s] No control service found at device, not an JK BMS..?",
-                 ADDR_STR(this->parent_->address_str()));
+        ESP_LOGE(TAG, "[%s] No control service found at device, not an JK BMS..?", this->parent_->address_str());
         break;
       }
 
@@ -519,8 +547,9 @@ void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
       if (param->notify.handle != this->notify_handle_)
         break;
 
+      char hex_buf[format_hex_pretty_size(MAX_HEX_DUMP_BYTES)];
       ESP_LOGVV(TAG, "Notification received: %s",
-                format_hex_pretty(param->notify.value, param->notify.value_len).c_str());  // NOLINT
+                format_hex_pretty_to(hex_buf, param->notify.value, param->notify.value_len, '.'));
 
       this->assemble(param->notify.value, param->notify.value_len);
 
@@ -534,7 +563,7 @@ void JkBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gat
 void JkBmsBle::update() {
   this->track_online_status_();
   if (this->node_state != espbt::ClientState::ESTABLISHED) {
-    ESP_LOGW(TAG, "[%s] Not connected", ADDR_STR(this->parent_->address_str()));
+    ESP_LOGW(TAG, "[%s] Not connected", this->parent_->address_str());
     return;
   }
 
@@ -547,13 +576,14 @@ void JkBmsBle::update() {
 bool JkBmsBle::write_register(uint8_t address, uint32_t value, uint8_t length) {
   auto frame = build_frame(address, value, length);
 
-  ESP_LOGD(TAG, "Write register: %s", format_hex_pretty(frame.data(), frame.size()).c_str());  // NOLINT
+  char hex_buf[format_hex_pretty_size(MAX_HEX_DUMP_BYTES)];
+  ESP_LOGD(TAG, "Write register: %s", format_hex_pretty_to(hex_buf, frame, '.'));
   auto status =
       esp_ble_gattc_write_char(this->parent_->get_gattc_if(), this->parent_->get_conn_id(), this->char_handle_,
                                frame.size(), frame.data(), ESP_GATT_WRITE_TYPE_NO_RSP, ESP_GATT_AUTH_REQ_NONE);
 
   if (status) {
-    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", ADDR_STR(this->parent_->address_str()), status);
+    ESP_LOGW(TAG, "[%s] esp_ble_gattc_write_char failed, status=%d", this->parent_->address_str(), status);
   }
 
   return (status == 0);
@@ -661,7 +691,7 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
   };
 
   const uint32_t now = millis();
-  if (now - this->last_cell_info_ < this->throttle_) {
+  if (this->last_cell_info_ != 0 && now - this->last_cell_info_ < this->throttle_) {
     return;
   }
   this->last_cell_info_ = now;
@@ -674,8 +704,7 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
   }
 
   ESP_LOGI(TAG, "Cell info frame (version %d, %zu bytes) received", frame_version, data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());                      // NOLINT
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());  // NOLINT
+  log_hex_chunked(TAG, data.data(), data.size());
 
   // 6 example responses (128+128+44 = 300 bytes per frame)
   //
@@ -890,7 +919,9 @@ void JkBmsBle::decode_jk02_cell_info_(const std::vector<uint8_t> &data) {
   ESP_LOGD(TAG, "Charge short circuit protection release timer: %d", jk_get_16bit(176 + offset));
   ESP_LOGD(TAG, "Undervoltage protection release timer: %d", jk_get_16bit(178 + offset));
   ESP_LOGD(TAG, "Overvoltage protection release timer: %d", jk_get_16bit(180 + offset));
-  ESP_LOGD(TAG, "Temperature sensor absent bitmask: %d", jk_get_16bit(182 + offset));
+  ESP_LOGD(TAG, "Temperature sensor presence bitmask: 0x%02X", data[182 + offset]);
+  // Bit set = sensor present (the official docs call it "absent", but real hardware shows the opposite)
+  // Unused inputs report 1 as well, so bit3-5 don't indicate an installed sensor
   // bit0: Mosfet temperature sensor
   // bit1: Temperature sensor 1
   // bit2: Temperature sensor 2
@@ -965,14 +996,13 @@ void JkBmsBle::decode_jk04_cell_info_(const std::vector<uint8_t> &data) {
   };
 
   const uint32_t now = millis();
-  if (now - this->last_cell_info_ < this->throttle_) {
+  if (this->last_cell_info_ != 0 && now - this->last_cell_info_ < this->throttle_) {
     return;
   }
   this->last_cell_info_ = now;
 
   ESP_LOGI(TAG, "Cell info frame (JK04, %zu bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 150).c_str());                      // NOLINT
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 150, data.size() - 150).c_str());  // NOLINT
+  log_hex_chunked(TAG, data.data(), data.size());
 
   // 0x55 0xAA 0xEB 0x90 0x02 0x4B 0xC0 0x61 0x56 0x40 0x1F 0xAA 0x56 0x40 0xFF 0x91 0x56 0x40 0xFF 0x91 0x56 0x40 0x1F
   // 0xAA 0x56 0x40 0xFF 0x91 0x56 0x40 0xFF 0x91 0x56 0x40 0xFF 0x91 0x56 0x40 0x1F 0xAA 0x56 0x40 0xFF 0x91 0x56 0x40
@@ -1157,8 +1187,7 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Settings frame (%zu bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
+  log_hex_chunked(TAG, data.data(), data.size());
 
   // JK02_24S response example:
   //
@@ -1376,7 +1405,7 @@ void JkBmsBle::decode_jk02_settings_(const std::vector<uint8_t> &data) {
     // 262   4   0x00 0x00 0x00 0x00
     // 266   4   0x00 0x00 0x00 0x00
     // 270   4   0x00 0x00 0x00 0x00
-    ESP_LOGI(TAG, "  Device address: %d", data[270]);
+    this->publish_state_(this->device_address_sensor_, (uint8_t) data[270]);
 
     // 274   4   0x00 0x00 0x00 0x00
     ESP_LOGI(TAG, "  Precharge time: %d s", data[274]);
@@ -1459,8 +1488,7 @@ void JkBmsBle::decode_jk04_settings_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Settings frame (JK04, %zu bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
+  log_hex_chunked(TAG, data.data(), data.size());
 
   // JK04 (JK-B2A16S v3) response example:
   //
@@ -1555,8 +1583,7 @@ void JkBmsBle::decode_logbook_(const std::vector<uint8_t> &data) {
 
   uint32_t log_count = jk_get_32bit(6);
   ESP_LOGI(TAG, "Logbook frame (%zu bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
+  log_hex_chunked(TAG, data.data(), data.size());
   ESP_LOGI(TAG, "  Log count: %lu", (unsigned long) log_count);
 
   for (uint32_t i = 0; i < log_count && i < 50; i++) {
@@ -1587,8 +1614,7 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   };
 
   ESP_LOGI(TAG, "Device info frame (%zu bytes) received", data.size());
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());                      // NOLINT
-  ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());  // NOLINT
+  log_hex_chunked(TAG, data.data(), data.size());
 
   // JK04 (JK-B2A16S v3) response example:
   //
@@ -1683,7 +1709,9 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data) {
   this->publish_state_(this->power_on_count_sensor_, (float) jk_get_32bit(42));
 
   // 46   16   0x4A 0x4B 0x5F 0x50 0x42 0x32 0x41 0x31 0x36 0x53 0x31 0x35 0x50 0x00 0x00 0x00
-  ESP_LOGI(TAG, "  Device name: %s", std::string(data.begin() + 46, data.begin() + 46 + 16).c_str());
+  auto device_name_begin = data.begin() + 46;
+  this->publish_state_(this->device_name_text_sensor_,
+                       std::string(device_name_begin, std::find(device_name_begin, device_name_begin + 16, '\0')));
 
   // 62   16   0x31 0x32 0x33 0x34 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
   ESP_LOGI(TAG, "  Device passcode: %s", std::string(data.begin() + 62, data.begin() + 62 + 16).c_str());
@@ -1883,6 +1911,23 @@ void JkBmsBle::reset_online_status_tracker_() {
 void JkBmsBle::publish_device_unavailable_() {
   this->publish_state_(this->online_status_binary_sensor_, false);
   this->publish_state_(this->errors_text_sensor_, "Offline");
+  this->publish_state_(this->errors_bitmask_hex_text_sensor_, "Offline");
+  this->publish_state_(this->charge_status_text_sensor_, "Offline");
+  this->publish_state_(this->balancer_status_text_sensor_, "Offline");
+  this->publish_state_(this->total_runtime_formatted_text_sensor_, "Offline");
+  this->publish_state_(this->emergency_time_countdown_sensor_, NAN);
+  this->publish_state_(this->smart_sleep_countdown_sensor_, NAN);
+  this->publish_state_(this->charge_status_id_sensor_, NAN);
+  this->publish_state_(this->charge_status_time_elapsed_sensor_, NAN);
+  this->publish_state_(this->detail_log_entry_count_sensor_, NAN);
+
+  this->invalidate_binary_sensor_(this->balancing_binary_sensor_);
+  this->invalidate_binary_sensor_(this->precharging_binary_sensor_);
+  this->invalidate_binary_sensor_(this->charging_binary_sensor_);
+  this->invalidate_binary_sensor_(this->discharging_binary_sensor_);
+  this->invalidate_binary_sensor_(this->heating_binary_sensor_);
+  this->invalidate_binary_sensor_(this->dry_contact_1_binary_sensor_);
+  this->invalidate_binary_sensor_(this->dry_contact_2_binary_sensor_);
 
   this->publish_state_(min_cell_voltage_sensor_, NAN);
   this->publish_state_(max_cell_voltage_sensor_, NAN);
@@ -1921,6 +1966,13 @@ void JkBmsBle::publish_state_(binary_sensor::BinarySensor *binary_sensor, const 
     return;
 
   binary_sensor->publish_state(state);
+}
+
+void JkBmsBle::invalidate_binary_sensor_(binary_sensor::BinarySensor *binary_sensor) {
+  if (binary_sensor == nullptr)
+    return;
+
+  binary_sensor->invalidate_state();
 }
 
 void JkBmsBle::publish_state_(number::Number *number, float value) {
